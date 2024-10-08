@@ -1,0 +1,2 @@
+0 Silver
+1 Not Silver
