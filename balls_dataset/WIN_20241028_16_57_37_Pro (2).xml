@@ -1,0 +1,26 @@
+<annotation>
+	<folder>balls_dataset</folder>
+	<filename>WIN_20241028_16_57_37_Pro (2).jpg</filename>
+	<path>C:\Users\Utente\Desktop\balls_dataset\WIN_20241028_16_57_37_Pro (2).jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>1280</width>
+		<height>720</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>silver_ball</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>729</xmin>
+			<ymin>311</ymin>
+			<xmax>1045</xmax>
+			<ymax>649</ymax>
+		</bndbox>
+	</object>
+</annotation>
