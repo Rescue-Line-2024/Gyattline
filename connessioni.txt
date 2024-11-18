@@ -1,0 +1,31 @@
+CONNESSIONI pca
+    ALIMENTAZIONE pca:guarda alla fine del documento
+
+    CONNESSIONI:
+       GND della pca <-> GND dell'arduino
+       5V della pca <-> 5V dell'arduino
+       SCL della pca <-> A5 dell'arduino
+       SDA della pca <-> A4 dell'arduino
+
+CONNESSIONI arduino(escluse quelle con la pca)
+    ALIMENTAZIONE arduino:Presa tramite raspberry
+
+    CONNESSIONI:
+        GPIO 3 <-> trig sensore frontale
+        GPIO 4 <-> echo sensore frontale
+
+        GPIO 5 <-> trig sensore sinistro
+        GIPIO 6 <-> echo sensore sinistro
+
+        I 5V E GND DI TUTTI I SENSORI SONO COLLEGATI ALL ARDUINO
+
+        TUTTI I SERVO SONO COLLEGATI ALLA PCA,CHE E' CONNESSA ALL'ARDUINO(guarda connessioni pca)
+
+BATTERIA 11.1 V
+        5V batteria <-> IN+ dello step down
+        GND batteria <-> IN- dello step down
+        OUT+ dello step down <-> + della PCA
+        OUT- dello step down <-> - della PCA
+
+POWERBANK:ALIMENTA RASPBERRY
+
