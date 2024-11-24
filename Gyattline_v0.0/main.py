@@ -1,17 +1,38 @@
-#NEXUS ANTARES Zenit
-from ric_colori import RiconosciColori
-import cv2
+#NEXUS ANTARES Zenith
+#OH FRA SE LAGGA IN CODA AL CICLO C'E' UNO SLEEP,TOGLILO
 
-Riconosci_verde = RiconosciColori([35,40,40],[75,255,255])
+from ric_colori import RiconosciColori
+from verdi_e_linea import Seguilinea
+import cv2
+import time
+
 
 cam = cv2.VideoCapture(0)
+if not cam.isOpened():
+    print("Errore nell'apertura della camera.")
+else:
+    # Ottieni la risoluzione della camera
+    width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+Line_follower = Seguilinea(P=3,I=0,D=0,min_area=30,cam_resolution=(width,height))
+Riconosci_verde = RiconosciColori([35,40,40],[75,255,255])
+
 while True:
     ret, frame = cam.read()
-    coordinate = Riconosci_verde.riconosci_colore(frame)
-    Riconosci_verde.disegna_bbox(coordinate,frame)
+    frame_colori = frame.copy()
+    
+    coordinate_nero = Line_follower.segui_linea(frame)
+    coordinate_verde = Riconosci_verde.riconosci_colore(frame_colori)
+
+    if coordinate_verde is not None:
+        Riconosci_verde.disegna_bbox(coordinate_verde,frame_colori)
+
     cv2.imshow("suca",frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+    
+    time.sleep(0.1) #toglierlo in futuro
 
 cam.release()
 cv2.destroyAllWindows()

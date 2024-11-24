@@ -1,78 +1,61 @@
 import time
+
 class gpPID:
-    def __init__(self,P,I,D,setpoint):
-            self.motoreDX = None
-            self.motoreSX = None
-   
-            
-            self.__KP = P
-            self.__KI = I
-            self.__KD = D
+    def __init__(self, P, I, D, setpoint = 0):
+        self.motoreDX = None
+        self.motoreSX = None
 
-            self.__setpoint = setpoint
+        self.__KP = P
+        self.__KI = I
+        self.__KD = D
 
-            self.__error = 0
-            self.lastgradi = 0
+        self.__setpoint = setpoint
 
-            self.__integral = 0
-            self.__last_error = 0
-            
-    def set_setpoint(self,value):
+        self.__error = 0
+        self.lastgradi = 0
+
+        self.__integral = 0
+        self.__last_error = 0
+
+    def set_setpoint(self, value):
         self.__setpoint = value
 
-    def calcolopid(self,value):
-        error = (int(self.__setpoint) - int(value))
+    def calcolopid(self, value):
+        error = int(self.__setpoint) - int(value)
         
-        integral = 0
-        derivative = 0
-
-        proportional = self.__KP * error
-        integral += self.__KI*error
+        # Accumula l'integrale
+        self.__integral += self.__KI * error
         
-        try:
-            derivative = self.__KD *(error-last_error)
-        except:
-            pass
+        # Calcola la derivata
+        derivative = self.__KD * (error - self.__last_error)
 
-        last_error = error
+        # Aggiorna l'errore precedente
+        self.__last_error = error
 
-        turn_rate = proportional + integral + derivative
+        # Calcola il valore di controllo
+        turn_rate = (self.__KP * error) + self.__integral + derivative
 
         return turn_rate
 
-    def initmotori(self,DX,SX):
+    def initmotori(self, DX, SX):
         self.motoreDX = DX
         self.motoreSX = SX
-        
-    def limitamotori(self,DX,limite):
-        if DX > limite:
-              return limite
-            
-        elif DX < -1*limite:
-              return -1*limite
-            
-        else:
-              return DX
-        
-    def calcolapotenzamotori(self,valore):
+
+    def limitamotori(self, DX, limite):
+        return max(min(DX, limite), -limite)
+
+    def calcolapotenzamotori(self, valore):
         deviazione = self.calcolopid(valore)
-        potenzaDX = 100+deviazione
-        potenzaSX = 100-deviazione
-        potenzaDX = self.limitamotori(potenzaDX,100)
-        potenzaSX = self.limitamotori(potenzaSX,100)
-      
+        potenzaDX = self.limitamotori(100 + deviazione, 100)
+        potenzaSX = self.limitamotori(100 - deviazione, 100)
+
         print(f"MOTORE DESTRO:{potenzaDX} MOTORE SINISTRO:{potenzaSX} DEVIAZIONE:{deviazione}")
-        return (int(potenzaDX/2.2),int(potenzaSX/2.2))
-    
-    def calcolopotenzaservopicarx(self,valore):
-        deviazione = self.calcolopid(valore) #tengo traccia della posizione del servo
-        Xc = self.__setpoint
-        poservo = 0
-        poservo = poservo - deviazione 
-        poservo = self.limitamotori(poservo,45)-10
-        
+        return (int(potenzaDX / 2.2), int(potenzaSX / 2.2))
+
+    def calcolopotenzaservopicarx(self, valore):
+        deviazione = self.calcolopid(valore)
+        poservo = self.limitamotori(-deviazione - 10, 45)
+
         self.ServoDir.angle(poservo)
         self.lastgradi = poservo
-        print("graduazione del servo:",int(poservo),",equivarrebbe a una curvatura di:",int(poservo+10))
-
-
+        print("graduazione del servo:", int(poservo), ",equivarrebbe a una curvatura di:", int(poservo + 10))
