@@ -16,7 +16,7 @@ else:
     height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 #DICHIARAZIONE DEGLI OGGETTI PRINCIPALI DEL SEGUILINEA
-Line_follower = Seguilinea(P=3,I=0,D=0,min_area=500,cam_resolution=(width,height))
+Line_follower = Seguilinea(P=3,I=0,D=0,PEN=0.5,min_area=500,cam_resolution=(width,height))
 Riconosci_verde = RiconosciColori([35,40,40],[75,255,255])
 #DICHIARAZIONE DEGLI OGGETTI PRINCIPALI DEL SEGUILINEAq
 

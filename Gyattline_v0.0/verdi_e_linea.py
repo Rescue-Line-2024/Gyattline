@@ -5,10 +5,11 @@ from ric_colori import RiconosciColori
 import time
 
 class Seguilinea:
-    def __init__(self,P,I,D,cam_resolution,min_area=200,cut_percentage = 0.5):
+    def __init__(self,P,I,D,PEN,cam_resolution,min_area=200,cut_percentage=0.5):
         
 
-        self.P,self.I,self.D = P , I , D
+        self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
+        self.PEN = PEN
 
         self.cut_percentage = cut_percentage
         self.cam_x = int(cam_resolution[0])
@@ -24,7 +25,7 @@ class Seguilinea:
 
         self.Colors_detector = RiconosciColori(self.bottom_value_green,self.upper_value_green)
         self.frame = None
-        self.pendenza = None
+        self.pendenza,self.deviazione = None,None
         self.min_area = min_area
 
     def segui_linea(self,frame):
@@ -66,7 +67,7 @@ class Seguilinea:
                 centro_linea = (x + x + w )/ 2  
 
                 #PRIMO PID : DEVIAZIONE TRA CENTRO DEL FRAME E LA LINEA#
-                deviazione = self.Pid_follow.calcolopid(centro_linea)
+                self.deviazione = self.Pid_follow.calcolopid(centro_linea)
                 #PRIMO PID : DEVIAZIONE TRA CENTRO DEL FRAME E LA LINEA#
 
                 #SECONDO PID : DISTANZA DAL PUNTO Csup E DAL PUNTO Cinf
@@ -90,22 +91,22 @@ class Seguilinea:
 
                 
                 
-                    self.pendenza = self.calcola_pendenza(Cinf, Csup, 1)*self.P
+                    self.pendenza = int(self.calcola_pendenza(A=Cinf, B=Csup, moltiplicator=self.PEN)*self.P)
+                    #piu il moltiplicatore è alto,più la linea sarà riconosciuta pendente
+
                     #si moltiplic per self.P per rendere equo il confronto
                     #tra il valore generato dal PID e il valore generato
                     #dal calcolo pendenza
                     
-                    #abs : valore assoluto
+                    
 
-                    if(abs(deviazione) > abs(self.pendenza)):
-                        pass
-                        #FAI SEGUILINEA
+                    if(abs(self.deviazione) > abs(self.pendenza)):
+                        print(f"deviazione ha la priorità con: {self.deviazione}")
                     
                     else:
-                        pass
-                        #AGGIUSTA LINEA
+                        print(f"pendenza ha la priorità con {self.pendenza}")
+                        
 
-                #print(f"DEVIAZIONE : {deviazione} PENDENZA LINEA: {self.pendenza}")
             else:
                 pass
 
@@ -116,17 +117,18 @@ class Seguilinea:
         potenzaDX, potenzaSX = self.Pid_follow.calcolapotenzamotori(deviazione)
         # Invia potenza ai motori (implementazione necessaria)
         print(f"Potenza Motore Destro: {potenzaDX}, Potenza Motore Sinistro: {potenzaSX}")
+        return potenzaDX,potenzaSX
 
     def calcola_pendenza(self, A, B,moltiplicator):
-        # Calcola la distanza tra x e x+w
-        distanza_x = B[0] - A[0]  # distanza tra x e x+w
-        h = float( (B[1] - A[1]) / self.cam_y )  # altezza h
+        
+        distanza_x = abs(B[0] - A[0] )
+        h = float( abs(B[1] - A[1]) / self.frame_y )  # altezza h,
+        #la dividiamo per la massima altezza del frame cosi h parte da 1
 
-        #PIU' H E' PICCOLA,PIU LA PENDENZA SARA ALTA E URGENTE
-        #E ANDRA AD AUMENTARE NOTEVOLMENTE LA DISTANZA TRA X E X+W
+        #PIU' H E' PICCOLA,PIU LA PENDENZA SARA ALTA E URGENTE,che fa da moltiplicatore
 
         # Modifica la distanza in base all'altezza h
-        if h > 0:  # Assicurati che h sia maggiore di zero per evitare divisione per zero
+        if h > 0:  
             distanza_modificata = (distanza_x / h) * moltiplicator   
         else:
             distanza_modificata = distanza_x  
@@ -150,8 +152,6 @@ class Seguilinea:
             y1+=self.cam_y-offset
             y2+=self.cam_y*self.cut_percentage
 
-            print(f"y parte inferiore:{y1}")
-            print(f"y parte superiore:{y2}")
             
             # Calcola i centri A e B
             A = (int((x1 + x1 + w1) / 2), int((y1 + y1 + h1) / 2))
@@ -160,8 +160,8 @@ class Seguilinea:
             B = (int((x2 + x2 + w2) / 2), int((y2 + y2 + h2) / 2))
             #qui non ce bisogno perchè y parte da 0 e non da un numero alto come in a
 
-            print(f"DOWN:{A},UP:{B}")
-            return (A,B)
+        
+            return (A,B) #rispettivamente down e up
         else:
             return None
 
