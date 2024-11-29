@@ -1,0 +1,4 @@
+classes = 2
+train = /path_to_dataset/train.txt
+valid = /path_to_dataset/val.txt
+names = /path_to_dataset/classes.names

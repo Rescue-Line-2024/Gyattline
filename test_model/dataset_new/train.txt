@@ -1,0 +1,95 @@
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_06_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_33_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_33_Pro (3).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_58_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_15_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_53_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_07_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_14_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_38_Pro (3).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_38_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_01_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_44_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_45_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_12_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_21_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_28_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_10_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_11_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_50_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_23_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_16_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_10_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_15_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_19_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_58_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_58_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_07_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_43_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_32_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_19_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_16_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_36_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_12_Pro (3).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_20_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_53_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_01_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_54_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_52_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20231002_16_28_14_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_14_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_10_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_38_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_13_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_20_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_20_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_46_Pro (3).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_20_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_38_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_09_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_44_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_46_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_38_Pro (4).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_24_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_38_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_51_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_13_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_18_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_55_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_43_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_46_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_24_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_16_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_19_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_54_20_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_28_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_40_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_55_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_32_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_19_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_32_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_11_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_12_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_17_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_55_30_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_34_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_57_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_33_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_20_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_45_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_01_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_55_08_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_42_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_18_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_58_10_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_38_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_23_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_16_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_55_07_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_44_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_51_Pro (3).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_51_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_56_38_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_30_Pro.jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_53_45_Pro (2).jpg
+c:\CODING\Gyattline\dataset_new/images\WIN_20241028_16_57_30_Pro.jpg

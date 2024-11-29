@@ -105,6 +105,12 @@ class Seguilinea:
                     
                     else:
                         print(f"pendenza ha la priorità con {self.pendenza}")
+                        if Cinf[0] < Csup[0]:
+                            print("DESTRA!")
+                            #muovi i motori 100,-100 per andare a destra
+                        else:
+                            print("SINISTRA!")
+                            #muovi i motori -100,100 per andare a sinistra
                         
 
             else:
