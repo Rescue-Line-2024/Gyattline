@@ -44,9 +44,10 @@ class Seguilinea:
 
 
                 x, y, w, h = posizione_linea[0]
-                y = y + int(self.cam_y*self.cut_percentage)
-                posizione_linea[0] = (x,y,w,h)
-                nero_coords = (x,y,w,h)
+                #la y del frame originale
+                y_original = y + int(self.cam_y*self.cut_percentage)
+                posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
+                nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
                 self.Colors_detector.disegna_bbox(posizione_linea,frame,(0,0,0))
 
                 A = (x,y)
@@ -59,7 +60,7 @@ class Seguilinea:
                     Center = (Centerx, Centery)
                     
                     # Disegna il cerchio solo se il punto è valido
-                    cv2.circle(frame, Center, 10, (255,0,0), -1)
+                    cv2.circle(frame, (Centerx,int( (y_original+y_original)/2) ) , 10, (255,0,0), -1)
             
                 except Exception as e:
                     print(f"Errore nel calcolo del centro: {e}")
@@ -80,7 +81,7 @@ class Seguilinea:
                 #raddrizzare la posizione della linea o seguirla
                 '''
                 #Guarda calcola_urgenza per capire come funziona
-                points = self.TrovaCentriLinea(frame_line,10)
+                points = self.TrovaCentriLinea(frame_line,10,y)
                 if points is not None:
                     Cinf,Csup = points
                     try:
@@ -142,11 +143,19 @@ class Seguilinea:
         return distanza_modificata
 
 
-    def TrovaCentriLinea(self, frame, offset):
+    def TrovaCentriLinea(self, frame, offset,start):
         # Suddividi il frame nelle due parti
         
         down_part = frame.copy()[self.frame_y-offset:self.frame_y, :]
         up_part = frame.copy()[0:offset, :]
+
+        if (start+offset) < self.frame_y:
+            up_part = frame.copy()[start:start+offset, :] #possibilità di uscire dal frame originale
+        else:
+            up_part = frame.copy()[start:self.frame_y, :] #cosi non esce dal frame
+      
+        if down_part.size == 0 or up_part.size == 0:
+            return None
 
         # Riconosci le linee nelle due parti
         Bboxes1 = self.Colors_detector.riconosci_nero(down_part, 10)
@@ -155,8 +164,8 @@ class Seguilinea:
         if Bboxes1 and Bboxes2:  # Controlla che entrambi non siano None
             x1, y1, w1, h1 = Bboxes1[0] #down
             x2, y2, w2, h2 = Bboxes2[0] #up
-            y1+=self.cam_y-offset
-            y2+=self.cam_y*self.cut_percentage
+            y1+=self.cam_y-offset#aggiustiamo la sfasatura pure qui(y del pallino inferiore)
+            y2+=start+(self.cam_y*self.cut_percentage)#sfasatura del pallino superiore
 
             
             # Calcola i centri A e B
