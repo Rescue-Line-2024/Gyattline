@@ -42,34 +42,31 @@ class Seguilinea:
             if posizione_linea is not None:
                 #----------CALCOLO PRIMO PID---------------#
 
+                posizione_linea = sorted(posizione_linea, key=lambda box: box[2] * box[3], reverse=True)
 
                 x, y, w, h = posizione_linea[0]
                 #la y del frame originale
                 y_original = y + int(self.cam_y*self.cut_percentage)
                 posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
                 nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
+                
                 self.Colors_detector.disegna_bbox(posizione_linea,frame,(0,0,0))
 
                 A = (x,y)
                 B = (x+w,y+h)
                         # Calcola centro in modo sicuro
                 try:
-                    Centerx = int((x + x + w) / 2)
-                    Centery = int((y + y + h) / 2)
+                    Centerx_Abs = (x + x + w) // 2
+                    Centery_Abs = (y + y + h) // 2
                     
-                    Center = (Centerx, Centery)
                     
-                    # Disegna il cerchio solo se il punto è valido
-                    cv2.circle(frame, (Centerx,int( (y_original+y_original)/2) ) , 10, (255,0,0), -1)
+                    
             
                 except Exception as e:
-                    print(f"Errore nel calcolo del centro: {e}")
+                    print(f"Errore nel calcolo del centro assoluto: {e}")
 
-                centro_linea = (x + x + w )/ 2  
 
-                #PRIMO PID : DEVIAZIONE TRA CENTRO DEL FRAME E LA LINEA#
-                self.deviazione = self.Pid_follow.calcolopid(centro_linea)
-                #PRIMO PID : DEVIAZIONE TRA CENTRO DEL FRAME E LA LINEA#
+                #PRIMO PID : (guarda giu nell if)
 
                 #SECONDO PID : DISTANZA DAL PUNTO Csup E DAL PUNTO Cinf
                 #Cinf è il punto in cui inizia la linea,Csup dove finisce
@@ -83,7 +80,16 @@ class Seguilinea:
                 #Guarda calcola_urgenza per capire come funziona
                 points = self.TrovaCentriLinea(frame_line,10,y)
                 if points is not None:
+                    
                     Cinf,Csup = points
+                    centro_linea_x = (Cinf[0]+Csup[0])//2
+                    centro_linea_y = (Cinf[1]+Csup[1])//2
+                    cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
+                    #media tra punto inferiore e punto superiore della linea
+                    #per trovarci la x centrale
+
+                
+                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
                     try:
                         cv2.circle(frame,Cinf,10,(0,255,0),-1)
                         cv2.circle(frame,Csup,10,(0,0,255),-1)
@@ -100,6 +106,7 @@ class Seguilinea:
                     #dal calcolo pendenza
                     
                     
+                    self.trovata_t(Cinf,Csup,nero_coords)
 
                     if(abs(self.deviazione) > abs(self.pendenza)):
                         print(f"deviazione ha la priorità con: {self.deviazione}")
@@ -112,12 +119,27 @@ class Seguilinea:
                         else:
                             print("SINISTRA!")
                             #muovi i motori -100,100 per andare a sinistra
-                        
+                else:
+                    #se uno dei due punti per un qualsiasi motivo non è stato trovato
+                    #il centro linea sarà il centro della bounding box
+                    centro_linea_x = (x+x+w)//2
+                    centro_linea_y = (y+y+h)//2
+                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+                    print("Deviazione normale : ",self.deviazione)       
 
             else:
                 pass
 
             return nero_coords
+
+    def trovata_t(self,Cinf,Csup,posiz_linea):
+            x,y,w,h = posiz_linea
+            #verifichiamo che punto superiore e inferiore siano piu o meno allineati al centro
+            if( (Cinf[0] > self.cam_x//2 - self.cam_x//10 and Cinf[0] < self.cam_x//2 + self.cam_x//10)
+            or(Csup[0] > self.cam_x//2 - self.cam_x//10 and Csup[0] < self.cam_x//2 + self.cam_x//10) ):
+                if(h >= self.frame_y - 3 and( x<3 or x+w>self.cam_x-3)):
+                    pass 
+                    #da completare
 
     def applica_movimento(self, deviazione):
         # Funzione per regolare il movimento dei motori in base alla deviazione calcolata
