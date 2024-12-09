@@ -50,7 +50,7 @@ class Seguilinea:
                 posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
                 nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
                 
-                self.Colors_detector.disegna_bbox(posizione_linea,frame,(0,0,0))
+                self.Colors_detector.disegna_bbox((posizione_linea[0],),frame,(0,0,0))
 
                 A = (x,y)
                 B = (x+w,y+h)
@@ -79,7 +79,9 @@ class Seguilinea:
                 '''
                 #Guarda calcola_urgenza per capire come funziona
                 points = self.TrovaCentriLinea(frame_line,10,y)
-                if points is not None:
+
+                #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti
+                if points is not None and points  != 0:
                     
                     Cinf,Csup = points
                     centro_linea_x = (Cinf[0]+Csup[0])//2
@@ -123,9 +125,11 @@ class Seguilinea:
                     #se uno dei due punti per un qualsiasi motivo non è stato trovato
                     #il centro linea sarà il centro della bounding box
                     centro_linea_x = (x+x+w)//2
-                    centro_linea_y = (y+y+h)//2
-                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-                    print("Deviazione normale : ",self.deviazione)       
+                    centro_linea_y = (y_original+y_original+h)//2
+                    cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
+                    if points != 0:
+                        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+                        print("Deviazione normale : ",self.deviazione)       
 
             else:
                 pass
@@ -184,21 +188,28 @@ class Seguilinea:
         Bboxes2 = self.Colors_detector.riconosci_nero(up_part, 10)
 
         if Bboxes1 and Bboxes2:  # Controlla che entrambi non siano None
-            x1, y1, w1, h1 = Bboxes1[0] #down
-            x2, y2, w2, h2 = Bboxes2[0] #up
-            y1+=self.cam_y-offset#aggiustiamo la sfasatura pure qui(y del pallino inferiore)
-            y2+=start+(self.cam_y*self.cut_percentage)#sfasatura del pallino superiore
+            if (len(Bboxes1)+len(Bboxes2)) == 2:
+                x1, y1, w1, h1 = Bboxes1[0] #down
+                x2, y2, w2, h2 = Bboxes2[0] #up
+                y1+=self.cam_y-offset#aggiustiamo la sfasatura pure qui(y del pallino inferiore)
+                y2+=start+(self.cam_y*self.cut_percentage)#sfasatura del pallino superiore
+
+                
+                # Calcola i centri A e B
+                A = (int((x1 + x1 + w1) / 2), int((y1 + y1 + h1) / 2))
+                #SICCOME IL FRAME RITAGLIATO HA LE COORDINATE RELATIVE INDIPENDENTI DAL FRAME ORIGINALE
+                #DOBBIAMO "PORTARE" IL CERCHIO SU NEL FRAME ORIGINALE
+                B = (int((x2 + x2 + w2) / 2), int((y2 + y2 + h2) / 2))
+                #qui non ce bisogno perchè y parte da 0 e non da un numero alto come in a
 
             
-            # Calcola i centri A e B
-            A = (int((x1 + x1 + w1) / 2), int((y1 + y1 + h1) / 2))
-            #SICCOME IL FRAME RITAGLIATO HA LE COORDINATE RELATIVE INDIPENDENTI DAL FRAME ORIGINALE
-            #DOBBIAMO "PORTARE" IL CERCHIO SU NEL FRAME ORIGINALE
-            B = (int((x2 + x2 + w2) / 2), int((y2 + y2 + h2) / 2))
-            #qui non ce bisogno perchè y parte da 0 e non da un numero alto come in a
-
-        
-            return (A,B) #rispettivamente down e up
+                return (A,B) #rispettivamente down e up
+            else:
+                return 0 
+                #non siamo riusciti a stabilire due punti specifici
+                #quindi vuol dire che la linea è urgentemente disallineata
+                #nel main faremo una curvatura totale a destra o a sinistra
+            
         else:
             return None
 
