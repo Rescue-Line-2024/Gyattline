@@ -1,0 +1,113 @@
+from threading import Thread, Lock
+from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
+from ric_colori import RiconosciColori
+from verdi_e_linea import Seguilinea
+import cv2
+import time
+
+
+class Robot:
+    def __init__(self):
+        self.stop_signal = False  # Segnale per terminare i thread
+        self.lock = Lock()  # Lock per sincronizzare l'accesso ai dati condivisi
+        self.shared_message = None  # Messaggio condiviso tra i thread
+
+        # Inizializza i thread
+        self.serial_thread = Thread(target=self.serial_communication)
+        self.camera_thread = Thread(target=self.camera_main)
+
+        # Avvia i thread
+        self.serial_thread.start()
+        self.camera_thread.start()
+
+    def serial_communication(self):
+        """
+        Funzione che gestisce la comunicazione seriale.
+        """
+        conn = SerialConnection(port='/dev/ttyUSB0', baudrate=115200)
+
+        try:
+            conn.open_connection()
+
+            while not self.stop_signal:
+                # Leggi messaggi dalla seriale
+                response = conn.read_message()
+                if response:
+                    print(f"Ricevuto dall'ESP32: {response}")
+
+                # Invia messaggi se presenti
+                with self.lock:
+                    if self.shared_message:
+                        conn.send_message(self.shared_message)
+                        self.shared_message = None
+
+            conn.close_connection()
+        except Exception as e:
+            print("Errore nella comunicazione seriale:", e)
+            conn.close_connection()
+
+    def camera_main(self):
+        """
+        Funzione principale con videocamera.
+        """
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            print("Errore nell'apertura della camera.")
+            return
+
+        desired_width = 160
+        desired_height = 120
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, desired_width)
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
+
+        width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        Line_follower = Seguilinea(P=3, I=0, D=0, PEN=0.5, min_area=500, cam_resolution=(width, height))
+        Riconosci_verde = RiconosciColori([35, 40, 40], [75, 255, 255])
+
+        try:
+            while not self.stop_signal:
+                ret, frame = cam.read()
+                if not ret:
+                    print("Errore nella lettura del frame.")
+                    break
+
+                frame_colori = frame.copy()
+
+                # Riconoscimento linea e verde
+                coordinate_nero = Line_follower.segui_linea(frame)
+                coordinate_verde = Riconosci_verde.riconosci_colore(frame_colori)
+
+                # Disegna bounding box
+                if coordinate_verde is not None:
+                    Riconosci_verde.disegna_bbox(coordinate_verde, frame_colori, (0, 255, 0))
+
+                # Condividi messaggi con il thread seriale
+                with self.lock:
+                    pass
+                    #qui ora rifletti su come passare i messaggi all'arduino
+
+                # Mostra i frame
+                cv2.imshow("Camera principale", frame)
+                cv2.imshow("Rilevamento colori", frame_colori)
+
+                # Interrompi con il tasto 'q'
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.stop_signal = True
+                    break
+        finally:
+            cam.release()
+            cv2.destroyAllWindows()
+
+    def join_threads(self):
+        """
+        Attende che i thread terminino.
+        """
+        self.serial_thread.join()
+        self.camera_thread.join()
+
+
+if __name__ == "__main__":
+    robot = Robot()
+    robot.join_threads()

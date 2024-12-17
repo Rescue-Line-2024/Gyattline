@@ -44,13 +44,13 @@ class gpPID:
     def limitamotori(self, DX, limite):
         return max(min(DX, limite), -limite)
 
-    def calcolapotenzamotori(self, valore):
+    def calcolapotenzamotori(self, valore,limite = 1):
         deviazione = self.calcolopid(valore)
         potenzaDX = self.limitamotori(100 + deviazione, 100)
         potenzaSX = self.limitamotori(100 - deviazione, 100)
 
-        print(f"MOTORE DESTRO:{potenzaDX} MOTORE SINISTRO:{potenzaSX} DEVIAZIONE:{deviazione}")
-        return (int(potenzaDX / 2.2), int(potenzaSX / 2.2))
+        #print(f"MOTORE DESTRO:{potenzaDX} MOTORE SINISTRO:{potenzaSX} DEVIAZIONE:{deviazione}")
+        return (int(potenzaDX / limite), int(potenzaSX / limite))
 
     def calcolopotenzaservopicarx(self, valore):
         deviazione = self.calcolopid(valore)

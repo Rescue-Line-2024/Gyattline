@@ -11,6 +11,7 @@ class Seguilinea:
         self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
         self.PEN = PEN
 
+        self.motoreDX,self.motoreSX = 0,0
         self.cut_percentage = cut_percentage
         self.cam_x = int(cam_resolution[0])
         self.cam_y = int(cam_resolution[1])
@@ -83,58 +84,71 @@ class Seguilinea:
                 #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti
                 if points is not None and points  != 0:
                     
-                    Cinf,Csup = points
-                    centro_linea_x = (Cinf[0]+Csup[0])//2
-                    centro_linea_y = (Cinf[1]+Csup[1])//2
-                    cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
-                    #media tra punto inferiore e punto superiore della linea
-                    #per trovarci la x centrale
-
-                
-                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-                    try:
-                        cv2.circle(frame,Cinf,10,(0,255,0),-1)
-                        cv2.circle(frame,Csup,10,(0,0,255),-1)
-                    except Exception as e:
-                        print("errore nel disegnare i cerchi:",e)
-
-                
-                
-                    self.pendenza = int(self.calcola_pendenza(A=Cinf, B=Csup, moltiplicator=self.PEN)*self.P)
-                    #piu il moltiplicatore è alto,più la linea sarà riconosciuta pendente
-
-                    #si moltiplic per self.P per rendere equo il confronto
-                    #tra il valore generato dal PID e il valore generato
-                    #dal calcolo pendenza
+                    centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
                     
-                    
-                    self.trovata_t(Cinf,Csup,nero_coords)
-
-                    if(abs(self.deviazione) > abs(self.pendenza)):
-                        print(f"deviazione ha la priorità con: {self.deviazione}")
-                    
-                    else:
-                        print(f"pendenza ha la priorità con {self.pendenza}")
-                        if Cinf[0] < Csup[0]:
-                            print("DESTRA!")
-                            #muovi i motori 100,-100 per andare a destra
-                        else:
-                            print("SINISTRA!")
-                            #muovi i motori -100,100 per andare a sinistra
                 else:
+                    MUL = 2 #CONTROLLA SEMPRE IL MOLTIPLICATORE
+                  
                     #se uno dei due punti per un qualsiasi motivo non è stato trovato
                     #il centro linea sarà il centro della bounding box
                     centro_linea_x = (x+x+w)//2
                     centro_linea_y = (y_original+y_original+h)//2
                     cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
                     if points != 0:
-                        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-                        print("Deviazione normale : ",self.deviazione)       
+                        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)*MUL
+
+
+                        print("Deviazione normale(controlla moltiplicatore) : ",self.deviazione)  
+
+                
+                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
+                #print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
 
             else:
                 pass
 
             return nero_coords
+    
+    def advanced_pid(self, points, frame, nero_coords):
+        """
+        Elabora i punti validi e calcola deviazione, pendenza e altre metriche.
+        """
+        Cinf, Csup = points
+        centro_linea_x = (Cinf[0] + Csup[0]) // 2
+        centro_linea_y = (Cinf[1] + Csup[1]) // 2
+        cv2.circle(frame, (centro_linea_x, centro_linea_y), 10, (255, 0, 0), -1)
+
+        # Calcolo deviazione tramite PID
+        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+
+        try:
+            cv2.circle(frame, Cinf, 10, (0, 255, 0), -1)
+            cv2.circle(frame, Csup, 10, (0, 0, 255), -1)
+        except Exception as e:
+            print("Errore nel disegnare i cerchi:", e)
+
+        # Calcolo pendenza
+        self.pendenza = int(self.calcola_pendenza(A=Cinf, B=Csup, moltiplicator=self.PEN) * self.P)
+
+        # Analisi e priorità tra deviazione e pendenza
+        self.trovata_t(Cinf, Csup, nero_coords)
+
+        if abs(self.deviazione) > abs(self.pendenza):
+            print(f"Deviazione ha la priorità con: {self.deviazione}")
+        else:
+            print(f"Pendenza ha la priorità con {self.pendenza}")
+            if Cinf[0] < Csup[0]:
+                print("DESTRA!")
+                self.motoreSX = 100
+                self.motoreDX = -100
+            else:
+                print("SINISTRA!")
+                self.motoreSX = 100
+                self.motoreDX = -100
+
+        # Calcolo potenza motori
+        self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
+        return centro_linea_x,centro_linea_y
 
     def trovata_t(self,Cinf,Csup,posiz_linea):
             x,y,w,h = posiz_linea

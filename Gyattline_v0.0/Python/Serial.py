@@ -15,13 +15,10 @@ class SerialConnection:
         self.serial = None  # Qui mettiamo la connessione quando la apriamo
 
     def open_connection(self):
-        """Apre la connessione seriale."""
-        try:
             self.serial = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
             print(f"Connessione seriale aperta su {self.port} a {self.baudrate} baud.")
-            time.sleep(2)  # Attendi che la connessione sia stabile (ESP32 lo richiede spesso)
-        except serial.SerialException as e:
-            print(f"Errore nell'apertura della connessione seriale: {e}")
+            time.sleep(2)  # Attendi che la connessione sia stabile 
+  
 
     def close_connection(self):
         """Chiude la connessione seriale."""
