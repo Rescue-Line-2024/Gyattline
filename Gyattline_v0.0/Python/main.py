@@ -33,7 +33,7 @@ class Robot:
                 # Leggi messaggi dalla seriale
                 response = conn.read_message()
                 if response:
-                    print(f"Ricevuto dall'ESP32: {response}")
+                    print(f"Ricevuto dall'arduino: {response}")
 
                 # Invia messaggi se presenti
                 with self.lock:
@@ -75,18 +75,23 @@ class Robot:
 
                 frame_colori = frame.copy()
 
-                # Riconoscimento linea e verde
-                coordinate_nero = Line_follower.segui_linea(frame)
+                #IL seguilinea tornerà un json con l'azione e il dato
+                
+                instruction = Line_follower.segui_linea(frame)
+                
+                
+                #se il verde viene riconosciuto,ha la priorità,da implementare
                 coordinate_verde = Riconosci_verde.riconosci_colore(frame_colori)
 
                 # Disegna bounding box
                 if coordinate_verde is not None:
                     Riconosci_verde.disegna_bbox(coordinate_verde, frame_colori, (0, 255, 0))
+                    
+                    
 
                 # Condividi messaggi con il thread seriale
                 with self.lock:
-                    pass
-                    #qui ora rifletti su come passare i messaggi all'arduino
+                    self.shared_message = instruction
 
                 # Mostra i frame
                 cv2.imshow("Camera principale", frame)

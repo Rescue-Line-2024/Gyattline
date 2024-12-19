@@ -58,3 +58,7 @@ class SerialConnection:
         else:
             print("Connessione seriale non aperta. Impossibile leggere.")
         return None
+
+    def send_instruction(self,action,data):
+        Json_message = {"action" : action,"data" : data} 
+        self.send_message(Json_message)

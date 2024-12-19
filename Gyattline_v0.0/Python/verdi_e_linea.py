@@ -98,16 +98,16 @@ class Seguilinea:
                         self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)*MUL
 
 
-                        print("Deviazione normale(controlla moltiplicatore) : ",self.deviazione)  
+                        #print("Deviazione normale(controlla moltiplicatore) : ",self.deviazione)  
 
                 
                 self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
-                #print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
+                print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
 
             else:
                 pass
 
-            return nero_coords
+            return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
     
     def advanced_pid(self, points, frame, nero_coords):
         """
@@ -134,9 +134,10 @@ class Seguilinea:
         self.trovata_t(Cinf, Csup, nero_coords)
 
         if abs(self.deviazione) > abs(self.pendenza):
-            print(f"Deviazione ha la priorità con: {self.deviazione}")
+            #print(f"Deviazione ha la priorità con: {self.deviazione}")
+            pass
         else:
-            print(f"Pendenza ha la priorità con {self.pendenza}")
+            #print(f"Pendenza ha la priorità con {self.pendenza}")
             if Cinf[0] < Csup[0]:
                 print("DESTRA!")
                 self.motoreSX = 100
