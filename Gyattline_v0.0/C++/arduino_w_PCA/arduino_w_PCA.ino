@@ -17,6 +17,38 @@ int Deviazione,c=0,last_error = 0;
 int timer = millis();
 bool ag = false;
 
+//MOTORI ANTERIORI
+void AvviaServoAvanti(int speed,int speed2) {
+  // Set PWM to control the speed and direction of the continuous rotation servo
+  board1.setPWM(0, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
+  board1.setPWM(1, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
+}
+//MOTORI POSTERIORI
+void AvviaServoIndietro(int speed,int speed2)
+{
+  board1.setPWM(2, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
+  board1.setPWM(3, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
+}
+
+void AvviaMotori(int DX,int SX,int lim = 100)
+{
+
+  int potenzaDX = DX;
+  int potenzaSX = SX;
+
+  potenzaDX = constrain(potenzaDX, -lim, lim);
+  potenzaSX = constrain(potenzaSX,-lim,lim);
+
+
+  AvviaServoAvanti(potenzaDX+10,-1*(potenzaSX)+10);
+
+
+  potenzaDX = constrain(potenzaDX, 0, lim);
+  potenzaSX = constrain(potenzaSX,0,lim);
+
+
+  AvviaServoIndietro(potenzaDX+10,-1*(potenzaSX)+10);
+}
 void stop()
 {
     AvviaServoAvanti(10,10);
@@ -82,7 +114,6 @@ String Message;
 int timer1 = millis();
 
 String Action;
-String Data;
 int MotoreDX,MotoreSX;
 void loop() {
 
@@ -103,13 +134,13 @@ void loop() {
     }
 
     Action = doc["action"].as<String>();  // Ottiene il valore associato alla chiave "comando"
-    Data = doc["data"];
+    
 
     
     if(Action == "motors")
         {
-        MotoreDX = Data[0];
-        MotoreSX = Data[1];
+        MotoreDX = doc["data"][0];
+        MotoreSX = doc["data"][1];
         AvviaMotori(MotoreDX,MotoreSX);
         }
 
@@ -120,38 +151,7 @@ void loop() {
 
 
 
-//MOTORI ANTERIORI
-void AvviaServoAvanti(int speed,int speed2) {
-  // Set PWM to control the speed and direction of the continuous rotation servo
-  board1.setPWM(0, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
-  board1.setPWM(1, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
-}
-//MOTORI POSTERIORI
-void AvviaServoIndietro(int speed,int speed2)
-{
-  board1.setPWM(2, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
-  board1.setPWM(3, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
-}
 
-void AvviaMotori(int DX,int SX,int lim = 100)
-{
-
-  int potenzaDX = DX;
-  int potenzaSX = SX;
-
-  potenzaDX = constrain(potenzaDX, -lim, lim);
-  potenzaSX = constrain(potenzaSX,-lim,lim);
-
-
-  AvviaServoAvanti(potenzaDX+10,-1*(potenzaSX)+10);
-
-
-  potenzaDX = constrain(potenzaDX, 0, lim);
-  potenzaSX = constrain(potenzaSX,0,lim);
-
-
-  AvviaServoIndietro(potenzaDX+10,-1*(potenzaSX)+10);
-}
 
 int CheckDistanza(int trig,int echo)
 {

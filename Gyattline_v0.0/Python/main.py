@@ -1,7 +1,7 @@
 from threading import Thread, Lock
 from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
 from ric_colori import RiconosciColori
-from verdi_e_linea import Seguilinea
+from Seguilinea import Seguilinea
 import cv2
 import time
 
@@ -24,7 +24,7 @@ class Robot:
         """
         Funzione che gestisce la comunicazione seriale.
         """
-        conn = SerialConnection(port='/dev/ttyUSB0', baudrate=115200)
+        conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
 
         try:
             conn.open_connection()
@@ -65,7 +65,8 @@ class Robot:
 
         Line_follower = Seguilinea(P=3, I=0, D=0, PEN=0.5, min_area=500, cam_resolution=(width, height))
         Riconosci_verde = RiconosciColori([35, 40, 40], [75, 255, 255])
-
+        
+        
         try:
             while not self.stop_signal:
                 ret, frame = cam.read()
@@ -96,6 +97,8 @@ class Robot:
                 # Mostra i frame
                 cv2.imshow("Camera principale", frame)
                 cv2.imshow("Rilevamento colori", frame_colori)
+
+            
 
                 # Interrompi con il tasto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):

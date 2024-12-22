@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 
 class RiconosciColori:
+    thresh = None # Variabile per conservare la maschera binaria
+
     def __init__(self, bottom_value,upper_value):
         self.bottom_value = np.array(bottom_value)
         self.upper_value = np.array(upper_value)
@@ -9,6 +11,7 @@ class RiconosciColori:
         #dal main io passerò un array a parametro:quello dell'inizio dell intervallo
         #e quello dela fine dell'intervallo esempio:rosso = RiconosciColori([170,0,0],[255,70,70])
         self.interval = (np.array(bottom_value),np.array(upper_value))
+        
 
     def riconosci_colore(self, image,min_area=100):
         """Riconosce i colori nell'immagine e restituisce le coordinate dei bounding box."""
@@ -34,18 +37,21 @@ class RiconosciColori:
 
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY_INV)
+        ret, threshold = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY_INV)
 
-        contours, hierarchy = cv2.findContours(thresh.copy(), 1, cv2.CHAIN_APPROX_NONE)
+        RiconosciColori.thresh = threshold
+
+        contours, hierarchy = cv2.findContours(threshold.copy(), 1, cv2.CHAIN_APPROX_NONE)
 
         # Filtro eventuali punti neri che danno fastidio
-        significant_contours = [contour for contour in contours if cv2.contourArea(contour) > min_area]
-
-        if len(significant_contours) > 0:
-            bounding_boxes = [(cv2.boundingRect(contour)) for contour in significant_contours]
-            return bounding_boxes
-        else:
-            return None
+        # Filtraggio e creazione dei bounding box
+        bounding_boxes = [
+            cv2.boundingRect(contour)  
+            for contour in contours #itera in ogni contorno,si trova l'area e vede
+            if cv2.contourArea(contour) > min_area        #se l'area è sufficiente,se si genera la BBox 
+        ]
+        
+        return bounding_boxes if bounding_boxes else None
     
         
 

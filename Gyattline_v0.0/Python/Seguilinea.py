@@ -106,6 +106,8 @@ class Seguilinea:
 
             else:
                 pass
+            
+
 
             return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
     
