@@ -40,7 +40,7 @@ class SerialConnection:
             try:
                 # Invia il messaggio convertendolo in bytes, seguito da un newline
                 self.serial.write((message + '\n').encode('utf-8'))
-                print(f"Inviato: {message}")
+                #print(f"Inviato: {message}")
             except Exception as e:
                 print(f"Errore nell'invio del messaggio: {e}")
         else:
@@ -57,7 +57,8 @@ class SerialConnection:
                 message = self.serial.readline().decode('utf-8').strip()
                 
                 if message:  # Se c'è qualcosa di valido
-                    print(f"Ricevuto: {message}")
+                    pass
+                    #print(f"Ricevuto: {message}")
                     
                     # Tentiamo di decodificare il messaggio come JSON
                     try:
@@ -65,7 +66,7 @@ class SerialConnection:
                         return json_message  # Se è JSON, ritorna il dizionario
                     except json.JSONDecodeError:
                         # Se non è un JSON valido, ritorna la stringa come tale
-                        print("Messaggio ricevuto non è un JSON valido.")
+                        #print("Messaggio ricevuto non è un JSON valido.")
                         return message
 
             except Exception as e:

@@ -33,7 +33,8 @@ class Robot:
                 # Leggi messaggi dalla seriale
                 response = conn.read_message()
                 if response:
-                    print(f"Ricevuto dall'arduino: {response}")
+                    pass
+                    #print(f"Ricevuto dall'arduino: {response}")
 
                 # Invia messaggi se presenti
                 with self.lock:
@@ -63,7 +64,7 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        Line_follower = Seguilinea(P=3, I=0, D=0, PEN=0.5, min_area=500, cam_resolution=(width, height))
+        Line_follower = Seguilinea(P=3, I=0, D=0, PEN=0.1, min_area=500, cam_resolution=(width, height),motor_limit = 20)
         Riconosci_verde = RiconosciColori([35, 40, 40], [75, 255, 255])
         
         
@@ -102,6 +103,7 @@ class Robot:
 
                 # Interrompi con il tasto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.shared_message = {"action" : "stop"}
                     self.stop_signal = True
                     break
         finally:

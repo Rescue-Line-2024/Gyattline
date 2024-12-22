@@ -5,12 +5,14 @@ from ric_colori import RiconosciColori
 import time
 
 class Seguilinea:
-    def __init__(self,P,I,D,PEN,cam_resolution,min_area=200,cut_percentage=0.5):
+    def __init__(self,P,I,D,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
         
-
+    
+        
         self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
         self.PEN = PEN
-
+        
+        self.motor_limit = motor_limit
         self.motoreDX,self.motoreSX = 0,0
         self.cut_percentage = cut_percentage
         self.cam_x = int(cam_resolution[0])
@@ -19,7 +21,7 @@ class Seguilinea:
         self.frame_x = None
         self.frame_y = None
 
-        self.Pid_follow = gpPID(P,I,D, int(self.cam_x/2) ) 
+        self.Pid_follow = gpPID(P,I,D,-1, int(self.cam_x/2)) 
 
         self.bottom_value_green = [35,40,40]
         self.upper_value_green = [75,255,255]
@@ -51,7 +53,7 @@ class Seguilinea:
                 posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
                 nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
                 
-                self.Colors_detector.disegna_bbox((posizione_linea[0],),frame,(0,0,0))
+                self.Colors_detector.disegna_bbox(posizione_linea,frame,(0,0,0))
 
                 A = (x,y)
                 B = (x+w,y+h)
@@ -82,22 +84,26 @@ class Seguilinea:
                 points = self.TrovaCentriLinea(frame_line,10,y)
 
                 #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti
-                if points is not None and points  != 0:
+                if points is not None and points  != 0 and points != 3:
                     
-                    centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
+                    esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
+                    if esito == "DESTRA":
+                        self.motoreDX,self.motoreSX = 25,-25
+                    if esito == "SINISTRA":
+                        self.motoreDX,self.motoreSX = -25,25
+                    
+                    if esito != "NIENTE":
+                        return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
                     
                 else:
-                    MUL = 2 #CONTROLLA SEMPRE IL MOLTIPLICATORE
                   
                     #se uno dei due punti per un qualsiasi motivo non è stato trovato
                     #il centro linea sarà il centro della bounding box
                     centro_linea_x = (x+x+w)//2
                     centro_linea_y = (y_original+y_original+h)//2
                     cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
-                    if points != 0:
-                        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)*MUL
-
-
+                    
+        
                         #print("Deviazione normale(controlla moltiplicatore) : ",self.deviazione)  
 
                 
@@ -107,25 +113,35 @@ class Seguilinea:
             else:
                 pass
             
-
-
+            if self.motoreDX and self.motoreSX:
+                self.motoreDX = self.limit_motor(self.motoreDX)
+                self.motoreSX = self.limit_motor(self.motoreSX)
             return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+        
+    def limit_motor(self,motore):
+        if motore > self.motor_limit:
+            return self.motor_limit
+        if motore < self.motor_limit*-1:
+            return -1*self.motor_limit
+        
+        return motore
     
     def advanced_pid(self, points, frame, nero_coords):
+        esito = "NIENTE"
         """
         Elabora i punti validi e calcola deviazione, pendenza e altre metriche.
         """
         Cinf, Csup = points
         centro_linea_x = (Cinf[0] + Csup[0]) // 2
         centro_linea_y = (Cinf[1] + Csup[1]) // 2
-        cv2.circle(frame, (centro_linea_x, centro_linea_y), 10, (255, 0, 0), -1)
+        cv2.circle(frame, (centro_linea_x, centro_linea_y), 5, (255, 0, 0), -1)
 
         # Calcolo deviazione tramite PID
         self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
 
         try:
-            cv2.circle(frame, Cinf, 10, (0, 255, 0), -1)
-            cv2.circle(frame, Csup, 10, (0, 0, 255), -1)
+            cv2.circle(frame, Cinf, 5, (0, 255, 0), -1)
+            cv2.circle(frame, Csup, 5, (0, 0, 255), -1)
         except Exception as e:
             print("Errore nel disegnare i cerchi:", e)
 
@@ -142,16 +158,15 @@ class Seguilinea:
             #print(f"Pendenza ha la priorità con {self.pendenza}")
             if Cinf[0] < Csup[0]:
                 print("DESTRA!")
-                self.motoreSX = 100
-                self.motoreDX = -100
+                esito = "DESTRA"
+                
             else:
                 print("SINISTRA!")
-                self.motoreSX = 100
-                self.motoreDX = -100
+                esito = "SINISTRA"
 
         # Calcolo potenza motori
         self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
-        return centro_linea_x,centro_linea_y
+        return esito,centro_linea_x,centro_linea_y
 
     def trovata_t(self,Cinf,Csup,posiz_linea):
             x,y,w,h = posiz_linea
@@ -221,6 +236,8 @@ class Seguilinea:
 
             
                 return (A,B) #rispettivamente down e up
+            elif(len(Bboxes1)+len(Bboxes2)) == 3:
+                return 3
             else:
                 return 0 
                 #non siamo riusciti a stabilire due punti specifici

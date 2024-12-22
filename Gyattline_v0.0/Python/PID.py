@@ -1,7 +1,9 @@
 import time
 
 class gpPID:
-    def __init__(self, P, I, D, setpoint = 0):
+    def __init__(self, P, I, D,inverted, setpoint = 0):
+        
+        self.inverted = inverted
         self.motoreDX = None
         self.motoreSX = None
 
@@ -35,7 +37,7 @@ class gpPID:
         # Calcola il valore di controllo
         turn_rate = (self.__KP * error) + self.__integral + derivative
 
-        return turn_rate
+        return turn_rate*self.inverted
 
     def initmotori(self, DX, SX):
         self.motoreDX = DX
