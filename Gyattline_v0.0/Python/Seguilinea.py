@@ -5,13 +5,13 @@ from ric_colori import RiconosciColori
 import time
 
 class Seguilinea:
-    def __init__(self,P,I,D,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
+    def __init__(self,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
         
     
         
         self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
         self.PEN = PEN
-        
+        self.P2 = P2
         self.motor_limit = motor_limit
         self.motoreDX,self.motoreSX = 0,0
         self.cut_percentage = cut_percentage
@@ -81,33 +81,42 @@ class Seguilinea:
                 #raddrizzare la posizione della linea o seguirla
                 '''
                 #Guarda calcola_urgenza per capire come funziona
-                points = self.TrovaCentriLinea(frame_line,10,y)
+                points = self.TrovaCentriLinea(frame_line,10,0)
 
                 #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti
                 if points is not None and points  != 0 and points != 3:
                     
                     esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
                     if esito == "DESTRA":
-                        self.motoreDX,self.motoreSX = 25,-25
+                        self.motoreDX,self.motoreSX = self.motor_limit,-1*self.motor_limit
                     if esito == "SINISTRA":
-                        self.motoreDX,self.motoreSX = -25,25
+                        self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
                     
                     if esito != "NIENTE":
                         return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
                     
                 else:
-                  
+
                     #se uno dei due punti per un qualsiasi motivo non è stato trovato
                     #il centro linea sarà il centro della bounding box
                     centro_linea_x = (x+x+w)//2
                     centro_linea_y = (y_original+y_original+h)//2
                     cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
+
+                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+                    #PIU' H E' BASSA , PIU LA DEVIAZIONE E' ALTA
+
+                    Multiplicator_h = float(h/self.frame_y) #da 1 a 0.000.....
+               
+                    if Multiplicator_h > 0:
+                        self.deviazione /= Multiplicator_h
                     
+                    self.deviazione*=self.P2
         
-                        #print("Deviazione normale(controlla moltiplicatore) : ",self.deviazione)  
+                    print("Deviazione (controlla moltiplicatore) : ",self.deviazione,"moltiplicatore : ",Multiplicator_h)  
 
                 
-                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
+                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
                 print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
 
             else:
@@ -187,16 +196,9 @@ class Seguilinea:
     def calcola_pendenza(self, A, B,moltiplicator):
         
         distanza_x = abs(B[0] - A[0] )
-        h = float( abs(B[1] - A[1]) / self.frame_y )  # altezza h,
-        #la dividiamo per la massima altezza del frame cosi h parte da 1
-
-        #PIU' H E' PICCOLA,PIU LA PENDENZA SARA ALTA E URGENTE,che fa da moltiplicatore
-
-        # Modifica la distanza in base all'altezza h
-        if h > 0:  
-            distanza_modificata = (distanza_x / h) * moltiplicator   
-        else:
-            distanza_modificata = distanza_x  
+       
+       
+        distanza_modificata = distanza_x  * moltiplicator
 
         return distanza_modificata
 

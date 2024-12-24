@@ -38,6 +38,7 @@ class gpPID:
         turn_rate = (self.__KP * error) + self.__integral + derivative
 
         return turn_rate*self.inverted
+    
 
     def initmotori(self, DX, SX):
         self.motoreDX = DX
@@ -46,8 +47,15 @@ class gpPID:
     def limitamotori(self, DX, limite):
         return max(min(DX, limite), -limite)
 
-    def calcolapotenzamotori(self, valore,limite = 1):
+    def calcolapotenzamotori_diretto(self, valore,limite = 1):
         deviazione = self.calcolopid(valore)
+        potenzaDX = self.limitamotori(100 + deviazione, 100)
+        potenzaSX = self.limitamotori(100 - deviazione, 100)
+
+        #print(f"MOTORE DESTRO:{potenzaDX} MOTORE SINISTRO:{potenzaSX} DEVIAZIONE:{deviazione}")
+        return (int(potenzaDX / limite), int(potenzaSX / limite))
+    
+    def calcolapotenzamotori(self, deviazione,limite = 1):
         potenzaDX = self.limitamotori(100 + deviazione, 100)
         potenzaSX = self.limitamotori(100 - deviazione, 100)
 
