@@ -6,9 +6,13 @@ import time
 
 class Seguilinea:
     def __init__(self,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
-        
-    
-        
+        self.BLUE = ([100, 150, 0], [140, 255, 255])  # Intervallo HSV per il blu
+        self.GREEN = ([35, 100, 50], [85, 255, 255])  # Intervallo HSV per il verde
+
+        #PER ADESSO HO MESSO IL BLU PER MANCANZA DI NASTRO VERDE,CAMBIARE I VALORI
+        self.min_area = min_area
+        self.Colors_detector = RiconosciColori(self.BLUE[0],self.BLUE[1],self.min_area)
+
         self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
         self.PEN = PEN
         self.P2 = P2
@@ -18,114 +22,151 @@ class Seguilinea:
         self.cam_x = int(cam_resolution[0])
         self.cam_y = int(cam_resolution[1])
 
-        self.frame_x = None
-        self.frame_y = None
+        self.cut_x = None
+        self.cut_y = None
 
         self.Pid_follow = gpPID(P,I,D,-1, int(self.cam_x/2)) 
 
-        self.bottom_value_green = [35,40,40]
-        self.upper_value_green = [75,255,255]
+        self.cut_tresh = None
 
-        self.Colors_detector = RiconosciColori(self.bottom_value_green,self.upper_value_green)
         self.frame = None
         self.pendenza,self.deviazione = None,None
-        self.min_area = min_area
 
     def segui_linea(self,frame):
+        self.frame = frame
+        frame_height = frame.shape[0]
+        frame_width = frame.shape[1]
 
-            self.frame = frame  # Leggi il frame dalla camera
-            frame_height = frame.shape[0]
-            frame_line = frame.copy()[int(frame_height*self.cut_percentage):frame_height, :]
-
-            self.frame_y = frame_line.shape[0]
-            self.frame_x = frame_line.shape[1]
-            posizione_linea = self.Colors_detector.riconosci_nero(image=frame_line, min_area=self.min_area)
-            nero_coords = None
-
-            if posizione_linea is not None:
-                #----------CALCOLO PRIMO PID---------------#
-
-                posizione_linea = sorted(posizione_linea, key=lambda box: box[2] * box[3], reverse=True)
-
-                x, y, w, h = posizione_linea[0]
-                #la y del frame originale
-                y_original = y + int(self.cam_y*self.cut_percentage)
-                posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
-                nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
-                
-                self.Colors_detector.disegna_bbox(posizione_linea,frame,(0,0,0))
-
-                A = (x,y)
-                B = (x+w,y+h)
-                        # Calcola centro in modo sicuro
-                try:
-                    Centerx_Abs = (x + x + w) // 2
-                    Centery_Abs = (y + y + h) // 2
-                    
-                    
-                    
-            
-                except Exception as e:
-                    print(f"Errore nel calcolo del centro assoluto: {e}")
-
-
-                #PRIMO PID : (guarda giu nell if)
-
-                #SECONDO PID : DISTANZA DAL PUNTO Csup E DAL PUNTO Cinf
-                #Cinf è il punto in cui inizia la linea,Csup dove finisce
-
-                
-
-                '''
-                la pendenza ci serve per capire se è piu urgente
-                #raddrizzare la posizione della linea o seguirla
-                '''
-                #Guarda calcola_urgenza per capire come funziona
-                points = self.TrovaCentriLinea(frame_line,10,0)
-
-                #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti
-                if points is not None and points  != 0 and points != 3:
-                    
-                    esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
-                    if esito == "DESTRA":
-                        self.motoreDX,self.motoreSX = self.motor_limit,-1*self.motor_limit
-                    if esito == "SINISTRA":
-                        self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
-                    
-                    if esito != "NIENTE":
-                        return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
-                    
-                else:
-
-                    #se uno dei due punti per un qualsiasi motivo non è stato trovato
-                    #il centro linea sarà il centro della bounding box
-                    centro_linea_x = (x+x+w)//2
-                    centro_linea_y = (y_original+y_original+h)//2
-                    cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
-
-                    self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-                    #PIU' H E' BASSA , PIU LA DEVIAZIONE E' ALTA
-
-                    Multiplicator_h = float(h/self.frame_y) #da 1 a 0.000.....
-               
-                    if Multiplicator_h > 0:
-                        self.deviazione /= Multiplicator_h
-                    
-                    self.deviazione*=self.P2
+        frame_cut = frame[int(frame_height*self.cut_percentage):frame_height, :].copy()  # Leggi il frame dalla camera
         
-                    print("Deviazione (controlla moltiplicatore) : ",self.deviazione,"moltiplicatore : ",Multiplicator_h)  
+        
 
+        self.cut_y = frame_cut.shape[0]
+        self.cut_x = frame_cut.shape[1]
+        #Ricorda che ogni volta che chiami questa funzione il tresh globale di riconosci colori si aggiorna
+
+        '''
+        Con .copy(), crei un array completamente nuovo e separato,
+        quindi eventuali modifiche a self.cut_tresh non influenzeranno RiconosciColori.thresh.
+        '''
+        posizione_verdi = self.Colors_detector.valutazione_verdi(image=self.frame)
+        if posizione_verdi is not None:
+                if posizione_verdi["position"] == "SX":
+                    Gx,Gy,Gw = posizione_verdi["upper_point"]
+                    cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
+                    #TAGLIAMO VIA LA PARTE DESTRA DELLA LINEA
+                    cv2.rectangle(img=self.frame,pt1=(Gx+Gw,0),pt2=(frame_width,frame_height),color=(255,255,255),thickness=-1)#di lato a destra
+                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(frame_width,Gy+Gw),color=(255,255,255),thickness=-1)#sopra
+
+                if posizione_verdi["position"] == "DX":
+                    Gx,Gy,Gw = posizione_verdi["upper_point"]
+                    cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
+                    #TAGLIAMO VIA LA PARTE SINISTRA DELLA LINEA
+                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(Gx,frame_height),color=(255,255,255),thickness=-1)#di lato a sinistra
+                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(frame_width,Gy+Gw),color=(255,255,255),thickness=-1)#sopra
+
+                if posizione_verdi["position"] == "DOUBLE":
+                    print("DOPPIO!")
                 
-                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
-                print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
 
-            else:
-                pass
+
+        posizione_linea = self.Colors_detector.riconosci_nero_tagliato(image=self.frame,frame_height=frame_height,cut_percentage=self.cut_percentage) #ci facciamo tornare direttamente le bbox
+        self.cut_tresh = RiconosciColori.thresh[int(frame_height*self.cut_percentage):frame_height, :].copy()
+        
+        
+        
+        #OGNI VOLTA CHE SI FA RICONOSCIMENTO NERO,VIENE SALVATO IN UNA VARIABILE DI CLASSE DI RICONOSCICOLORI
+        #IL TRESH TOTALE DI TUTTO IL FRAME DEL NERO 
+
+        nero_coords = None
+
+        
+
+        if posizione_linea is not None:
+            #----------CALCOLO PRIMO PID---------------#
+
+
+            x, y, w, h = posizione_linea[0]
             
-            if self.motoreDX and self.motoreSX:
-                self.motoreDX = self.limit_motor(self.motoreDX)
-                self.motoreSX = self.limit_motor(self.motoreSX)
-            return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+            #la y del frame originale
+            y_original = y + int(self.cam_y*self.cut_percentage)
+            posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
+            nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
+            
+            #self.Colors_detector.disegna_bbox((posizione_linea[0],),frame,(0,0,0))
+
+
+            A = (x,y)
+            B = (x+w,y+h)
+                    # Calcola centro in modo sicuro
+            try:
+                Centerx_Abs = (x + x + w) // 2
+                Centery_Abs = (y + y + h) // 2
+                
+                
+                
+        
+            except Exception as e:
+                print(f"Errore nel calcolo del centro assoluto: {e}")
+
+
+            #PRIMO PID : (guarda giu nell if)
+
+            #SECONDO PID : DISTANZA DAL PUNTO Csup E DAL PUNTO Cinf
+            #Cinf è il punto in cui inizia la linea,Csup dove finisce
+
+            
+
+            '''
+            la pendenza ci serve per capire se è piu urgente
+            #raddrizzare la posizione della linea o seguirla
+            '''
+        
+            points = self.TrovaCentriLinea(10,0)
+
+            #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti(si disattiva quando ci sono verdi)
+            if points is not None and points  != 0 and points != 3 and posizione_verdi is None:
+                
+                esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
+                if esito == "DESTRA":
+                    self.motoreDX,self.motoreSX = self.motor_limit,-1*self.motor_limit
+                if esito == "SINISTRA":
+                    self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
+                
+                if esito != "NIENTE":
+                    return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+                
+            else:
+
+                #se uno dei due punti per un qualsiasi motivo non è stato trovato
+                #il centro linea sarà il centro della bounding box
+                centro_linea_x = (x+x+w)//2
+                centro_linea_y = (y_original+y_original+h)//2
+                cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
+
+                self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+                #PIU' H E' BASSA , PIU LA DEVIAZIONE E' ALTA
+
+                Multiplicator_h = float(h/self.cut_y) #da 1 a 0.000.....
+            
+                if Multiplicator_h > 0:
+                    self.deviazione /= Multiplicator_h
+                
+                self.deviazione*=self.P2
+    
+                print("Deviazione (controlla moltiplicatore) : ",self.deviazione,"moltiplicatore : ",Multiplicator_h)  
+
+            
+            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
+            print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
+
+        else:
+            pass
+        
+        if self.motoreDX and self.motoreSX:
+            self.motoreDX = self.limit_motor(self.motoreDX)
+            self.motoreSX = self.limit_motor(self.motoreSX)
+        return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
         
     def limit_motor(self,motore):
         if motore > self.motor_limit:
@@ -182,7 +223,7 @@ class Seguilinea:
             #verifichiamo che punto superiore e inferiore siano piu o meno allineati al centro
             if( (Cinf[0] > self.cam_x//2 - self.cam_x//10 and Cinf[0] < self.cam_x//2 + self.cam_x//10)
             or(Csup[0] > self.cam_x//2 - self.cam_x//10 and Csup[0] < self.cam_x//2 + self.cam_x//10) ):
-                if(h >= self.frame_y - 3 and( x<3 or x+w>self.cam_x-3)):
+                if(h >= self.cut_y - 3 and( x<3 or x+w>self.cam_x-3)):
                     pass 
                     #da completare
 
@@ -203,49 +244,52 @@ class Seguilinea:
         return distanza_modificata
 
 
-    def TrovaCentriLinea(self, frame, offset,start):
-        # Suddividi il frame nelle due parti
-        
-        down_part = frame.copy()[self.frame_y-offset:self.frame_y, :]
-        up_part = frame.copy()[0:offset, :]
+    def TrovaCentriLinea(self, offset, start):
+        # Usa la maschera binaria invece di riconoscere di nuovo il nero
+        if self.cut_tresh is None:
+            print("Errore: Maschera binaria non trovata.")
+            return None
 
-        if (start+offset) < self.frame_y:
-            up_part = frame.copy()[start:start+offset, :] #possibilità di uscire dal frame originale
-        else:
-            up_part = frame.copy()[start:self.frame_y, :] #cosi non esce dal frame
-      
+        # Ritaglia le parti superiore e inferiore dalla maschera binaria
+        down_part = self.cut_tresh[self.cut_y - offset:self.cut_y, :]
+        up_part = self.cut_tresh[start:start + offset, :] if (start + offset) < self.cut_y else RiconosciColori.thresh[start:self.cut_y, :]
+
         if down_part.size == 0 or up_part.size == 0:
             return None
 
-        # Riconosci le linee nelle due parti
-        Bboxes1 = self.Colors_detector.riconosci_nero(down_part, 10)
-        Bboxes2 = self.Colors_detector.riconosci_nero(up_part, 10)
+        # Trova i contorni nelle due parti
+        contours_down, _ = cv2.findContours(down_part, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_up, _ = cv2.findContours(up_part, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        if Bboxes1 and Bboxes2:  # Controlla che entrambi non siano None
-            if (len(Bboxes1)+len(Bboxes2)) == 2:
-                x1, y1, w1, h1 = Bboxes1[0] #down
-                x2, y2, w2, h2 = Bboxes2[0] #up
-                y1+=self.cam_y-offset#aggiustiamo la sfasatura pure qui(y del pallino inferiore)
-                y2+=start+(self.cam_y*self.cut_percentage)#sfasatura del pallino superiore
+        # Controlla che ci siano contorni validi
+        if contours_down and contours_up:
+            # Trova il bounding box principale in entrambe le parti
+            Bboxes1 = [cv2.boundingRect(c) for c in contours_down if cv2.contourArea(c) > 10]
+            Bboxes2 = [cv2.boundingRect(c) for c in contours_up if cv2.contourArea(c) > 10]
 
-                
-                # Calcola i centri A e B
+            if Bboxes1 and Bboxes2 and (len(Bboxes1) + len(Bboxes2)) == 2:
+                # Calcola i centri delle bounding box
+                x1, y1, w1, h1 = Bboxes1[0]  # down
+                x2, y2, w2, h2 = Bboxes2[0]  # up
+
+                # Aggiusta la coordinata y per la parte inferiore
+
+                y1+=self.cam_y*self.cut_percentage
+                y2+=self.cam_y*self.cut_percentage
+
+                y1 += self.cut_y - offset
+                y2 += start
+
+
+                # Calcola i centri
                 A = (int((x1 + x1 + w1) / 2), int((y1 + y1 + h1) / 2))
-                #SICCOME IL FRAME RITAGLIATO HA LE COORDINATE RELATIVE INDIPENDENTI DAL FRAME ORIGINALE
-                #DOBBIAMO "PORTARE" IL CERCHIO SU NEL FRAME ORIGINALE
                 B = (int((x2 + x2 + w2) / 2), int((y2 + y2 + h2) / 2))
-                #qui non ce bisogno perchè y parte da 0 e non da un numero alto come in a
 
-            
-                return (A,B) #rispettivamente down e up
-            elif(len(Bboxes1)+len(Bboxes2)) == 3:
+                return (A, B)  # rispettivamente down e up
+            elif len(Bboxes1) + len(Bboxes2) == 3:
                 return 3
             else:
-                return 0 
-                #non siamo riusciti a stabilire due punti specifici
-                #quindi vuol dire che la linea è urgentemente disallineata
-                #nel main faremo una curvatura totale a destra o a sinistra
-            
+                return 0  # Nessun punto valido trovato
         else:
             return None
 

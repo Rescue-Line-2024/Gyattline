@@ -64,8 +64,8 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        Line_follower = Seguilinea(P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=500, cam_resolution=(width, height),motor_limit = 20)
-        Riconosci_verde = RiconosciColori([35, 40, 40], [75, 255, 255])
+        Line_follower = Seguilinea(P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=50, cam_resolution=(width, height),motor_limit = 20)
+        
         
         
         try:
@@ -80,15 +80,6 @@ class Robot:
                 #IL seguilinea tornerà un json con l'azione e il dato
                 
                 instruction = Line_follower.segui_linea(frame)
-                
-                
-                #se il verde viene riconosciuto,ha la priorità,da implementare
-                coordinate_verde = Riconosci_verde.riconosci_colore(frame_colori)
-
-                # Disegna bounding box
-                if coordinate_verde is not None:
-                    Riconosci_verde.disegna_bbox(coordinate_verde, frame_colori, (0, 255, 0))
-                    
                     
 
                 # Condividi messaggi con il thread seriale
