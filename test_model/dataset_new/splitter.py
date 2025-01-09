@@ -1,18 +1,26 @@
 import os
 import random
+import shutil
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
 # Directory del dataset
+current_dir = os.path.dirname(os.path.abspath(__file__))
 images_dir = f"{current_dir}/images"
 labels_dir = f"{current_dir}/labels"
-output_dir = current_dir
 
-# Percorsi dei file di output
-train_txt = os.path.join(output_dir, "train.txt")
-val_txt = os.path.join(output_dir, "val.txt")
+# Cartelle di output per train e val
+train_images_dir = f"{images_dir}/train"
+val_images_dir = f"{images_dir}/val"
+train_labels_dir = f"{labels_dir}/train"
+val_labels_dir = f"{labels_dir}/val"
 
 # Percentuale di dati per il validation set
 val_split = 0.2
+
+# Crea le sottocartelle train e val, se non esistono
+os.makedirs(train_images_dir, exist_ok=True)
+os.makedirs(val_images_dir, exist_ok=True)
+os.makedirs(train_labels_dir, exist_ok=True)
+os.makedirs(val_labels_dir, exist_ok=True)
 
 # Ottieni tutte le immagini
 images = [f for f in os.listdir(images_dir) if f.endswith(".jpg")]
@@ -25,14 +33,23 @@ split_idx = int(len(images) * (1 - val_split))
 train_images = images[:split_idx]
 val_images = images[split_idx:]
 
-# Salva i percorsi delle immagini nei file train.txt e val.txt
-with open(train_txt, "w") as train_file:
-    for img in train_images:
-        train_file.write(os.path.join(images_dir, img) + "\n")
+# Funzione per spostare immagini e annotazioni
+def move_files(image_list, target_images_dir, target_labels_dir):
+    for img in image_list:
+        # Sposta l'immagine
+        img_path = os.path.join(images_dir, img)
+        shutil.move(img_path, os.path.join(target_images_dir, img))
 
-with open(val_txt, "w") as val_file:
-    for img in val_images:
-        val_file.write(os.path.join(images_dir, img) + "\n")
+        # Sposta il file di annotazione corrispondente (.txt)
+        label_path = os.path.join(labels_dir, img.replace(".jpg", ".txt"))
+        if os.path.exists(label_path):
+            shutil.move(label_path, os.path.join(target_labels_dir, img.replace(".jpg", ".txt")))
+
+# Sposta i file di training
+move_files(train_images, train_images_dir, train_labels_dir)
+
+# Sposta i file di validazione
+move_files(val_images, val_images_dir, val_labels_dir)
 
 print("Dataset diviso in train e val!")
 print(f"Train set: {len(train_images)} immagini")

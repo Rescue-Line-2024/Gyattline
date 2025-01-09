@@ -1,4 +1,5 @@
 classes = 2
-train = /path_to_dataset/train.txt
-valid = /path_to_dataset/val.txt
-names = /path_to_dataset/classes.names
+train = C:\CODING\Gyattline\test_model\dataset_new\images\train
+valid = C:\CODING\Gyattline\test_model\dataset_new\images\val
+nc: 2
+names = C:\CODING\Gyattline\test_model\dataset_new\classes.names

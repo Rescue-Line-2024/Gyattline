@@ -1,3 +1,5 @@
+https://chatgpt.com/share/678018e0-4a0c-8004-bca5-98d8fb41c98c
+
 prima insttalla queste librerie 
 pip install torch torchvision numpy matplotlib opencv-python
 

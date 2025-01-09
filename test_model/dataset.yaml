@@ -1,0 +1,10 @@
+# Nome del dataset
+path: /path_to_dataset  # Cambia con il percorso del tuo dataset
+train: images/train  # Percorso relativo al set di training
+val: images/val      # Percorso relativo al set di validazione
+
+# Numero di classi
+nc: 2
+
+# Nomi delle classi
+names: ["silver_ball", "black_ball"]
