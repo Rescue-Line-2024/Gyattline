@@ -64,7 +64,7 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        Line_follower = Seguilinea(P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=50, cam_resolution=(width, height),motor_limit = 20)
+        Line_follower = Seguilinea(cam=cam,P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=50, cam_resolution=(width, height),motor_limit = 20)
         
         
         
@@ -79,7 +79,11 @@ class Robot:
 
                 #IL seguilinea tornerà un json con l'azione e il dato
                 
-                instruction = Line_follower.segui_linea(frame)
+                Line_follower.segui_linea(frame)
+                if Seguilinea.messaggio is not None:
+                    instruction = Seguilinea.messaggio
+                else:
+                    continue
                     
 
                 # Condividi messaggi con il thread seriale

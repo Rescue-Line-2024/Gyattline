@@ -115,14 +115,19 @@ class RiconosciColori:
 
         if len(contours) > 0:
 
+
             bounding_boxes = [
                 cv2.boundingRect(contour)  
-                for contour in contours #itera in ogni contorno,si trova l'area e vede
-                if cv2.contourArea(contour) > self.min_area        #se l'area è sufficiente,se si genera la BBox 
+                for contour in contours #itera in ogni contorno, si trova l'area e vede
+                if cv2.contourArea(contour) > self.min_area  #se l'area è sufficiente, genera la BBox 
             ]
 
-            bounding_boxes = sorted(bounding_boxes, key=lambda box: box[2] * box[3], reverse=True)#prima le BB più grandi
-            self.disegna_bbox(bounding_boxes,image,(0,255,0))
+            bounding_boxes = sorted(bounding_boxes, key=lambda box: box[2] * box[3], reverse=True)  # prima le BB più grandi
+
+            # Correggi le coordinate delle bounding box
+            bounding_boxes = [(x, y + max_row_index + 1, w, h) for x, y, w, h in bounding_boxes]
+
+            self.disegna_bbox(bounding_boxes, image, (0, 255, 0))
 
 
             if len(bounding_boxes) == 1:

@@ -5,13 +5,17 @@ from ric_colori import RiconosciColori
 import time
 
 class Seguilinea:
-    def __init__(self,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
+    messaggio = None
+
+    def __init__(self,cam,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
+        self.cam = cam
+
         self.BLUE = ([100, 150, 0], [140, 255, 255])  # Intervallo HSV per il blu
         self.GREEN = ([35, 100, 50], [85, 255, 255])  # Intervallo HSV per il verde
 
         #PER ADESSO HO MESSO IL BLU PER MANCANZA DI NASTRO VERDE,CAMBIARE I VALORI
         self.min_area = min_area
-        self.Colors_detector = RiconosciColori(self.BLUE[0],self.BLUE[1],self.min_area)
+        self.Colors_detector = RiconosciColori(self.GREEN[0],self.GREEN[1],self.min_area)
 
         self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
         self.PEN = PEN
@@ -49,24 +53,6 @@ class Seguilinea:
         Con .copy(), crei un array completamente nuovo e separato,
         quindi eventuali modifiche a self.cut_tresh non influenzeranno RiconosciColori.thresh.
         '''
-        posizione_verdi = self.Colors_detector.valutazione_verdi(image=self.frame)
-        if posizione_verdi is not None:
-                if posizione_verdi["position"] == "SX":
-                    Gx,Gy,Gw = posizione_verdi["upper_point"]
-                    cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
-                    #TAGLIAMO VIA LA PARTE DESTRA DELLA LINEA
-                    cv2.rectangle(img=self.frame,pt1=(Gx+Gw,0),pt2=(frame_width,frame_height),color=(255,255,255),thickness=-1)#di lato a destra
-                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(frame_width,Gy+Gw),color=(255,255,255),thickness=-1)#sopra
-
-                if posizione_verdi["position"] == "DX":
-                    Gx,Gy,Gw = posizione_verdi["upper_point"]
-                    cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
-                    #TAGLIAMO VIA LA PARTE SINISTRA DELLA LINEA
-                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(Gx,frame_height),color=(255,255,255),thickness=-1)#di lato a sinistra
-                    cv2.rectangle(img=self.frame,pt1=(0,0),pt2=(frame_width,Gy+Gw),color=(255,255,255),thickness=-1)#sopra
-
-                if posizione_verdi["position"] == "DOUBLE":
-                    print("DOPPIO!")
                 
 
 
@@ -95,6 +81,66 @@ class Seguilinea:
             
             #self.Colors_detector.disegna_bbox((posizione_linea[0],),frame,(0,0,0))
 
+            #-----VERDI----#
+            posizione_verdi = self.Colors_detector.valutazione_verdi(image=self.frame)
+            if posizione_verdi is not None:
+
+                    
+                    current_PEN = self.PEN
+                    self.PEN*=5
+
+                    esito = " "
+                    while esito != "NIENTE":
+                        ret,self.frame = self.cam.read()
+                        frame_cut = self.frame[int(frame_height*self.cut_percentage):frame_height, :].copy()  # Leggi il frame dalla camera
+                        posizione_linea = self.Colors_detector.riconosci_nero_tagliato(image=self.frame,frame_height=frame_height,cut_percentage=self.cut_percentage) #ci facciamo tornare direttamente le bbox
+                        if posizione_linea is None:
+                            break
+
+                        self.cut_tresh = RiconosciColori.thresh[int(frame_height*self.cut_percentage):frame_height, :].copy()
+                        x, y, w, h = posizione_linea[0]
+                        nero_coords = (x,y,w,h)
+                        
+                        points = self.TrovaCentriLinea(10,0)
+                        if points is not None and points  != 0 and points != 3:
+                            esito,centro_linea_x,centro_linea_y = self.advanced_pid(points,frame_cut,nero_coords)
+                            if esito == "DESTRA":
+                                self.motoreDX,self.motoreSX = 20,-1*20
+                                print("DESTRA VERDE!!!!")
+                            if esito == "SINISTRA":
+                                self.motoreDX,self.motoreSX = -1*20,20
+                                print("SINISTRA VERDE!!!!")
+
+                            
+                            Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+                                                        
+                            if cv2.waitKey(1) & 0xFF == ord('q'):
+                                break
+                            
+                            try:
+                                cv2.imshow("Camera principale:",frame)
+                            except:
+                                print("Impossibile visualizzare frame")
+                        else:
+                            break
+
+                    self.PEN = current_PEN
+                    
+
+                    if posizione_verdi["position"] == "SX":
+                        Gx,Gy,Gw = posizione_verdi["upper_point"]
+                        cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
+
+                        
+
+                    if posizione_verdi["position"] == "DX":
+                        Gx,Gy,Gw = posizione_verdi["upper_point"]
+                        cv2.circle(frame,(Gx,Gy),5,(255,255,255),-1)
+                        
+
+                    if posizione_verdi["position"] == "DOUBLE":
+                        print("DOPPIO!")
+            #-----VERDI----#
 
             A = (x,y)
             B = (x+w,y+h)
@@ -125,16 +171,16 @@ class Seguilinea:
             points = self.TrovaCentriLinea(10,0)
 
             #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti(si disattiva quando ci sono verdi)
-            if points is not None and points  != 0 and points != 3 and posizione_verdi is None:
+            if points is not None and points  != 0 and points != 3:
                 
-                esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
+                esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)#i motori vengono modificati qui
                 if esito == "DESTRA":
                     self.motoreDX,self.motoreSX = self.motor_limit,-1*self.motor_limit
                 if esito == "SINISTRA":
                     self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
                 
                 if esito != "NIENTE":
-                    return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+                    Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
                 
             else:
 
@@ -166,7 +212,7 @@ class Seguilinea:
         if self.motoreDX and self.motoreSX:
             self.motoreDX = self.limit_motor(self.motoreDX)
             self.motoreSX = self.limit_motor(self.motoreSX)
-        return {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+        Seguilinea.messaggio =  {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
         
     def limit_motor(self,motore):
         if motore > self.motor_limit:
