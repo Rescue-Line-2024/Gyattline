@@ -84,7 +84,7 @@ class RiconosciColori:
 
         return bounding_boxes if bounding_boxes else None
     
-    def valutazione_verdi(self,image):
+    def riconosci_verdi(self,image):
         #qui ora si lavora con le due mask confrontandole
         #le mask dovrebbero essere entrambi delle stesse dimensioni del frame originale
         mask_verde = self.riconosci_colore_mask(image).copy()
@@ -129,31 +129,33 @@ class RiconosciColori:
 
             self.disegna_bbox(bounding_boxes, image, (0, 255, 0))
 
-
-            if len(bounding_boxes) == 1:
-                x,y,w,h = bounding_boxes[0]
+            verdi_valutati = [] #SARA' UN ARRRAY DI DICT
+            for box in bounding_boxes:
+                x,y,w,h = box
                 center_x = (x+x+w)//2
-                center_y = (y+y+h)//2
+                center_y = (y+y+h)//2-max_row_index 
+                #sopra abbiamo sfasato le coordinate del verde di +max_row_index per farle vedere
+                #bene a schermo,quindi ora dobbiamo toglierli max_row_index alla y
+                #per far combaciare le coordinate di nero e verde
 
                 
 
                 # Dividi la maschera nera tagliata a sinistra e a destra di center_x
-                nero_sinistra = np.sum(mask_nero_cutted[center_y:, :center_x])
-                nero_destra = np.sum(mask_nero_cutted[center_y:, center_x:])
+                nero_sinistra = np.sum(mask_nero_cutted[center_y:, :center_x].copy())
+                nero_destra = np.sum(mask_nero_cutted[center_y:, center_x:].copy())
+
+                
 
                 # Determina dove c'è più nero
                 if nero_destra > nero_sinistra:
-                    posizione = {'position': "SX", 'upper_point': (x, y, w)} #quindi verde a sinistra
+                    posizione = {'position': "SX", 'coords': (x, y, w, h)} #quindi verde a sinistra
                 elif nero_destra < nero_sinistra:
-                    posizione = {'position': "DX", 'upper_point': (x+w, y, w)} #quindi verde a destra
+                    posizione = {'position': "DX", 'coords': (x, y, w, h)} #quindi verde a destra
                 else:
-                    posizione = {'position': "CENTER", 'upper_point': (x, y, w)}
+                    posizione = {'position': "CENTER", 'coords': (x, y, w, h)}
 
-                return posizione
-
-
-            if len(bounding_boxes) == 2:
-                return {'position':"DOUBLE"} #doppio verde
+                verdi_valutati.append(posizione)
+            return verdi_valutati
 
         # Se non ci sono contorni verdi validi
         return None
