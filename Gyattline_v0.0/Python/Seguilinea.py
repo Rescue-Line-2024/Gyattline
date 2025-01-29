@@ -107,8 +107,12 @@ class Seguilinea:
             
                         if posizione == "DX":
                             print("GIRA A DESTRA!verde")
+                            Seguilinea.messaggio = {"action" : "motors","data" : [30,0]}
+                            return
                         if posizione == "SX":
                             print("GIRA A SINISTRA!verde")
+                            Seguilinea.messaggio = {"action" : "motors","data" : [0,30]} 
+                            return
 
                     if len(verdi_da_considerare) == 2:
                         print("DOPPIO!")
