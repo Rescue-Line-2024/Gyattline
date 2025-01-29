@@ -33,7 +33,15 @@ class Robot:
                 # Leggi messaggi dalla seriale
                 response = conn.read_message()
                 if response:
-                    pass
+                    if response["action"] == "front_sensor":
+                        sensore = response["data"]
+                        Seguilinea.sensoreFrontale = sensore
+
+                    if response["action"] == "sensors":
+                        SDx = response["DX"]
+                        SSx = response["SX"]
+                        Seguilinea.sensoreDx = SDx
+                        Seguilinea.sensoreSx = SSx
                     #print(f"Ricevuto dall'arduino: {response}")
 
                 # Invia messaggi se presenti

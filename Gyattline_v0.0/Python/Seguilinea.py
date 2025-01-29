@@ -3,10 +3,15 @@ import numpy as np
 from PID import gpPID
 from ric_colori import RiconosciColori
 import time
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 class Seguilinea:
     messaggio = None
-
+    sensoreFrontale = None
+    sensoreDx = None
+    sensoreSx = None
     def __init__(self,cam,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
         self.cam = cam
 
@@ -30,6 +35,7 @@ class Seguilinea:
         self.cut_y = None
 
         self.Pid_follow = gpPID(P,I,D,-1, int(self.cam_x/2)) 
+        self.Pid_muro = gpPID(P,I,D,-1,int(7))
 
         self.cut_tresh = None
 
@@ -71,6 +77,8 @@ class Seguilinea:
         if posizione_linea is not None:
             #----------CALCOLO PRIMO PID---------------#
 
+            self.gestisci_ostacoli(secondi_sleep=1)
+                
 
             x, y, w, h = posizione_linea[0]
             
@@ -156,7 +164,7 @@ class Seguilinea:
                     self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
                 
                 if esito != "NIENTE":
-                    Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+                    self.AvviaMotori(self.motoreDX,self.motoreSX)
                 
             else:
 
@@ -166,21 +174,14 @@ class Seguilinea:
                 centro_linea_y = (y_original+y_original+h)//2
                 cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
 
-                self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-                #PIU' H E' BASSA , PIU LA DEVIAZIONE E' ALTA
-
-                Multiplicator_h = float(h/self.cut_y) #da 1 a 0.000.....
-            
-                if Multiplicator_h > 0:
-                    self.deviazione /= Multiplicator_h
+                self.deviazione = self.calcola_deviazione(centro_linea_x,h)
                 
-                self.deviazione*=self.P2
     
-                print("Deviazione (controlla moltiplicatore) : ",self.deviazione,"moltiplicatore : ",Multiplicator_h)  
+                
 
             
             self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
-            print(f"PotenzaDX: {self.motoreDX} PotenzaSX : {self.motoreSX}")     
+            
 
         else:
             pass
@@ -188,7 +189,98 @@ class Seguilinea:
         if self.motoreDX and self.motoreSX:
             self.motoreDX = self.limit_motor(self.motoreDX)
             self.motoreSX = self.limit_motor(self.motoreSX)
-        Seguilinea.messaggio =  {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
+
+        self.AvviaMotori(self.motoreDX,self.motoreSX)
+
+    #^^^^^^^^^LOGICA DEL CODICE DI SEGUILINEA PRINCIPALE^^^^^^^^^^^^^^^^^^^
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def calcola_deviazione(self, centro_linea_x, altezza_bbox):
+        deviazione = self.Pid_follow.calcolopid(centro_linea_x)
+        multiplicator_h = max(0.01, altezza_bbox / self.cut_y)  # Evita divisione per 0
+        deviazione /= multiplicator_h
+        logging.debug(f"deviazione={deviazione} , moltiplicatore={multiplicator_h}")
+        return deviazione * self.P2
+
+    def gestisci_ostacoli(self,secondi_sleep):
+        if Seguilinea.sensoreFrontale is not None and Seguilinea.sensoreFrontale < 15:
+            print("Ostacolo rilevato!")
+               
+            if posizione_linea is not None:
+                    
+                for i in range (10):
+                    Seguilinea.messaggio = {"action": "sensors", "data": " "} #aspettando l'arduino che torna
+                                                                              #i valori dei sensori dx e sx
+                
+                if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
+                    print("Sensori laterali  non rilevati!")
+                    return
+                
+
+                direzione = "destra" if Seguilinea.sensoreDx > Seguilinea.sensoreSx else "sinistra"
+                print(f"Schivando ostacolo da {direzione}...")
+                
+                self.AvviaMotori(self.motor_limit, -self.motor_limit) if direzione == "destra" else self.AvviaMotori(-self.motor_limit, self.motor_limit)
+                time.sleep(secondi_sleep)
+                    
+                    
+            while True:
+                ret,self.frame = self.cam.read()
+                posizione_linea = self.Colors_detector.riconosci_nero_tagliato(
+                    image=self.frame, frame_height=self.cam_y, cut_percentage=self.cut_percentage
+                )
+                if posizione_linea is not None:
+                    x, y, w, h = posizione_linea[0]  
+                else:
+                    w = 0
+
+
+
+                if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
+                    Seguilinea.messaggio = {"action": "sensors", "data": " "}
+                    continue
+                
+                distanza_laterale = Seguilinea.sensoreSx if direzione == "destra" else Seguilinea.sensoreDx
+
+                deviazione = self.Pid_muro.calcolopid(distanza_laterale) #
+                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione)
+                self.AvviaMotori(self.motoreDX,self.motoreSX)
+                logging.debug(f"deviazione con muro: {deviazione}")
+
+                if w > self.cam_x//0.3:
+                    print("ostacolo schivato!")
+                    break
+                    
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+                try:
+                    cv2.imshow("visuale ostacolo",self.frame)
+                except:
+                    logging.debug("probabilmente sei sul cmd,impossibile visualizzare il frame!")
+
+                
+
+                    
+            Seguilinea.sensoreFrontale = None
+            Seguilinea.sensoreDx = None
+            Seguilinea.sensoreSx = None
+            cv2.destroyAllWindows()
+
+ 
         
     def limit_motor(self,motore):
         if motore > self.motor_limit:
@@ -314,7 +406,9 @@ class Seguilinea:
                 return 0  # Nessun punto valido trovato
         else:
             return None
-
+    
+    def AvviaMotori(self,DX,SX):
+        Seguilinea.messaggio = {"action" : "motors","data" : [DX,SX]}
 
 
         

@@ -35,7 +35,7 @@ class gpPID:
         self.__last_error = error
 
         # Calcola il valore di controllo
-        turn_rate = (self.__KP * error) + self.__integral + derivative
+        turn_rate = (self.__KP * error) + self.__integral + derivative #calcolo deviazione
 
         return turn_rate*self.inverted
     
@@ -56,6 +56,7 @@ class gpPID:
         return (int(potenzaDX / limite), int(potenzaSX / limite))
     
     def calcolapotenzamotori(self, deviazione,limite = 1):
+        
         potenzaDX = self.limitamotori(100 + deviazione, 100)
         potenzaSX = self.limitamotori(100 - deviazione, 100)
 

@@ -1,174 +1,111 @@
-#include <Adafruit_PWMServoDriver.h>
-#include <Wire.h>
-#include <ArduinoJson.h>  // Include la libreria ArduinoJson
-Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);  // called this way, it uses the default address 0x40  
+#include <HCSR04.h> //ultrasonic library
+#include <Wire.h> //i2c library
+#include <Adafruit_PWMServoDriver.h> //servo hub library 
+#include <ArduinoJson.h> //arduino json library
+
+//ServoDriver
+Adafruit_PWMServoDriver servohub = Adafruit_PWMServoDriver(0x40); //object servo hub, uses the 0x40 adress
+#define servomin 100 //Adjust according to your servo
+#define servomax 600 //Adjust according to your servo
 
 
-#define SERVOMIN  100   // Adjust according to your servo
-#define SERVOMAX  600   // Adjust according to your servo
-#define Muro_trig 5
-#define Muro_echo 6
-#define Ostacolo_trig 3
-#define Ostacolo_echo 4
-#define IN_A0  A1
-
-long durata,cm,durata2,cm2,rifrazione,err;
-int Deviazione,c=0,last_error = 0;
-int timer = millis();
-bool ag = false;
-
-//MOTORI ANTERIORI
-void AvviaServoAvanti(int speed,int speed2) {
-  // Set PWM to control the speed and direction of the continuous rotation servo
-  board1.setPWM(0, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
-  board1.setPWM(1, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
-}
-//MOTORI POSTERIORI
-void AvviaServoIndietro(int speed,int speed2)
-{
-  board1.setPWM(2, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
-  board1.setPWM(3, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
+// Funzione per inviare JSON al seriale
+void inviaJSON(StaticJsonDocument<200>& doc) {
+  String output;
+  serializeJson(doc, output);  // Serializza il documento JSON in una stringa
+  Serial.println(output);      // Invia la stringa serializzata
 }
 
-void AvviaMotori(int DX,int SX,int lim = 100)
-{
-
-  int potenzaDX = DX;
-  int potenzaSX = SX;
-
-  potenzaDX = constrain(potenzaDX, -lim, lim);
-  potenzaSX = constrain(potenzaSX,-lim,lim);
-
-
-  AvviaServoAvanti(potenzaDX+10,-1*(potenzaSX)+10);
-
-
-  potenzaDX = constrain(potenzaDX, 0, lim);
-  potenzaSX = constrain(potenzaSX,0,lim);
-
-
-  AvviaServoIndietro(potenzaDX+10,-1*(potenzaSX)+10);
+//motori anteriori
+void avviaservoavanti(int velocita, int velocita2){ //move front servos
+  servohub.setPWM(0, 0, map(velocita, -100, 100, servomin, servomax));  //slot 0
+  servohub.setPWM(1, 0, map(velocita2, -100, 100, servomin, servomax)); //slot 1
 }
-void stop()
-{
-    AvviaServoAvanti(10,10);
-    AvviaServoIndietro(10,10);
-}
-void setup() {
-  Serial.begin(9600);
-  cm = 1000;
-  board1.begin();
-  board1.setPWMFreq(60);      
-  AvviaServoAvanti(10,10);
-  AvviaServoIndietro(10,10);
- 
-  pinMode (IN_A0,INPUT);
 
-
-  pinMode(Muro_trig, OUTPUT);
-  pinMode(Muro_echo, INPUT);
-
-  pinMode(Ostacolo_trig,OUTPUT);
-  pinMode(Ostacolo_echo,INPUT);
-
-  impostaservo(145,4); //TILT (160 per il seguilinea,115 per le palline)
-  impostaservo(95,15);
- 
-  gestiscibraccio(200); //braccio sopra
-  apribracci();
+//motori posteriori
+void avviaservodietro(int velocita, int velocita2){ //move back servos
+  servohub.setPWM(2, 0, map(velocita, -100, 100, servomin, servomax));  //slot 2
+  servohub.setPWM(3, 0, map(velocita, -100, 100, servomin, servomax));  //slot 3
 
 }
 
-
-
-
-
-void apribracci()
-{
-  impostaservo(20,13);  //20 aperto 70 chiuso
-  impostaservo(180,14); //180 aperto 135 chiuso
-}
-void chiudibracci()
-{
-  impostaservo(60,13);  //20 aperto 70 chiuso
-  impostaservo(60,14); //180 aperto 135 chiuso
+//avviamento dei motori
+void avviomotori(int dx, int sx, int lim = 100){  //start servos
+  dx = constrain(dx, -lim, lim);
+  sx = constrain(sx, -lim, lim);
+  avviaservoavanti(dx+10, -1*sx+10);
+  avviaservodietro(dx+10, -1*sx+10);
 }
 
+//omniwheels
+void avvio_omni(int dx, int sx, int lim = 100){
+  dx = constrain(dx, -lim, lim);
+  sx = constrain(sx, -lim, lim);
+  avviaservoavanti(dx+10, -1*sx+10);
+  dx = constrain(dx, 0, lim);
+  sx = constrain(sx, 0, lim);
+  avviaservodietro(dx+10, -1*sx+10);
+}
+
+//imposta i servo
 void impostaservo(int gradi,int pin){board1.setPWM(pin, 0, angleToPulse(gradi) );}
 
-void gestiscibraccio(int gradi)
-{
-  impostaservo(180-gradi,9);
-  impostaservo(gradi,8);
+
+
+//HCSR04 sensore(trigger, echo);
+UltraSonicDistanceSensor sensore1(13, 12); //inizializzo sensore ultrasuoni n.1
+UltraSonicDistanceSensor sensore2(8, 7); //inizializzo sensore ultrasuoni n.2
+UltraSonicDistanceSensor sensore3(4, 2); //inizializzo sensore ultrasuoni n.3
+
+//esempio uso:  int u2 = sensore2.measureDistanceCm();
+
+
+void setup() {
+  Serial.begin(115200);
+  servohub.begin();        //starts the servohub
+  servohub.setPWMFreq(60); //frequenza servohb (60ms)
+  avviomotori(0, 0);        //starts to stop
 }
 
+int time_elapsed = millis();
 
-String Message;
-
-
-
-
-
-
-
-int timer1 = millis();
-
-String Action;
-int MotoreDX,MotoreSX;
 void loop() {
+  if(Serial.available()>0){ 
 
-
-  if (Serial.available() > 0) {
-
-    Message = Serial.readStringUntil('\n');
-    Serial.println("Messaggio ricevuto: " + Message);
-
-    StaticJsonDocument<200> doc;  // Creazione di un buffer JSON
-
+    //messages
+    String Message = Serial.readStringUntil('\n'); //read until new line
+    Serial.print("Messaggio ricevuto: "+Message);  //debug message
+    StaticJsonDocument<200> doc;  // buffer json
     DeserializationError error = deserializeJson(doc, Message);
-
-    if (error) {
-      Serial.print("Errore nella deserializzazione: ");
-      Serial.println(error.c_str());
-      return;  // Esci se c'è un errore
+    if(error){
+      Serial.print("Errore nella deserializzazione: "); Serial.println(error.c_str()); //error debuggin
+      return;
     }
 
-    Action = doc["action"].as<String>();  // Ottiene il valore associato alla chiave "comando"
-    
+    //action
+    String Action = doc["action"].as<String>(); //starts the command line after the world 'action'
 
-    
-    if(Action == "motors")
-        {
-        MotoreDX = doc["data"][0];
-        MotoreSX = doc["data"][1];
-        AvviaMotori(MotoreDX,MotoreSX);
-        }
+    //logic
+    if(Action == "stop") avviomotori(0, 0); //completly stops servos
+    if(Action == "motors") avvio_omni(doc["data"][0], doc["data"][1]); //(motoredx, motoresx) reads directly the data by ArduinoJson
+    if(Action == "sensors") {
+      responseDoc["action"] = "sensors"
+      responseDoc[""]
+    }
 
-    
-    
+    if (millis()-time_elapsed>1){
+      //invia il messaggio
+        responseDoc["action"] = "front_sensor"; //risponde ad action con il front sensor
+        responseDoc["data"] = u1;           //data = u1
+        inviaJSON(responseDoc); //funzione invia json
+    }
+
+    if(u1>=15)  time_elapsed = millis();
+      
+  
+
+  int angleToPulse(int ang){
+    int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);// map angle of 0 to 180 to Servo min and Servo max
+    return pulse;
   }
 }
-
-
-
-
-
-int CheckDistanza(int trig,int echo)
-{
-  digitalWrite(trig, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trig, LOW);
-  int durata = pulseIn(echo, HIGH);
-  int cm = durata / 58;
-  return cm;
-}
-
-
-
-int angleToPulse(int ang){
-   int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);// map angle of 0 to 180 to Servo min and Servo max
-   return pulse;
-}
-
