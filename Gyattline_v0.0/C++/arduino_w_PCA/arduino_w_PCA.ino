@@ -67,6 +67,7 @@ UltraSonicDistanceSensor sensore3(4, 2); //inizializzo sensore ultrasuoni n.3
 
 
 void invia_sensori()
+{
       String output;
       StaticJsonDocument<200> responseDoc;
       responseDoc["action"] = "sensors";
