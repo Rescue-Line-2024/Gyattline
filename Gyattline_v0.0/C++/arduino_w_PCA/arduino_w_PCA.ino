@@ -9,12 +9,18 @@ Adafruit_PWMServoDriver servohub = Adafruit_PWMServoDriver(0x40); //object servo
 #define servomax 600 //Adjust according to your servo
 
 
-// Funzione per inviare JSON al seriale
-void inviaJSON(StaticJsonDocument<200>& doc) {
-  String output;
-  serializeJson(doc, output);  // Serializza il documento JSON in una stringa
-  Serial.println(output);      // Invia la stringa serializzata
-}
+int time_elapsed;
+
+int angleToPulse(int ang){
+    int pulse = map(ang,0, 180, servomin,servomax);// map angle of 0 to 180 to Servo min and Servo max
+    return pulse;
+  }
+  
+  /*
+  Se velocita vale -100, la funzione restituirà il valore servomin (100).
+Se velocita vale 100, restituirà servomax (600).
+Se velocita vale 0, restituirà un valore intermedio, tipicamente il punto medio tra servomin e servomax (ad esempio, circa 350).
+  */
 
 //motori anteriori
 void avviaservoavanti(int velocita, int velocita2){ //move front servos
@@ -48,7 +54,7 @@ void avvio_omni(int dx, int sx, int lim = 100){
 }
 
 //imposta i servo
-void impostaservo(int gradi,int pin){board1.setPWM(pin, 0, angleToPulse(gradi) );}
+void impostaservo(int gradi,int pin){servohub.setPWM(pin, 0, angleToPulse(gradi) );}
 
 
 
@@ -60,21 +66,34 @@ UltraSonicDistanceSensor sensore3(4, 2); //inizializzo sensore ultrasuoni n.3
 //esempio uso:  int u2 = sensore2.measureDistanceCm();
 
 
+void invia_sensori()
+      String output;
+      StaticJsonDocument<200> responseDoc;
+      responseDoc["action"] = "sensors";
+      responseDoc["data"]["front"] = sensore1.measureDistanceCm();
+      responseDoc["data"]["left"] = sensore2.measureDistanceCm();
+      responseDoc["data"]["right"] = sensore3.measureDistanceCm();
+      serializeJson(responseDoc, output);
+      Serial.println(output);
+}
+
 void setup() {
   Serial.begin(115200);
   servohub.begin();        //starts the servohub
   servohub.setPWMFreq(60); //frequenza servohb (60ms)
   avviomotori(0, 0);        //starts to stop
+  time_elapsed = millis();
 }
 
-int time_elapsed = millis();
+
 
 void loop() {
   if(Serial.available()>0){ 
 
     //messages
     String Message = Serial.readStringUntil('\n'); //read until new line
-    Serial.print("Messaggio ricevuto: "+Message);  //debug message
+
+
     StaticJsonDocument<200> doc;  // buffer json
     DeserializationError error = deserializeJson(doc, Message);
     if(error){
@@ -87,25 +106,19 @@ void loop() {
 
     //logic
     if(Action == "stop") avviomotori(0, 0); //completly stops servos
-    if(Action == "motors") avvio_omni(doc["data"][0], doc["data"][1]); //(motoredx, motoresx) reads directly the data by ArduinoJson
-    if(Action == "sensors") {
-      responseDoc["action"] = "sensors"
-      responseDoc[""]
+    else if(Action == "motors") avvio_omni(doc["data"][0], doc["data"][1]); //(motoredx, motoresx) reads directly the data by ArduinoJson
+    else if( (Action == "get_sensors") )  {
+        invia_sensori();
     }
 
-    if (millis()-time_elapsed>1){
-      //invia il messaggio
-        responseDoc["action"] = "front_sensor"; //risponde ad action con il front sensor
-        responseDoc["data"] = u1;           //data = u1
-        inviaJSON(responseDoc); //funzione invia json
-    }
-
-    if(u1>=15)  time_elapsed = millis();
-      
-  
-
-  int angleToPulse(int ang){
-    int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);// map angle of 0 to 180 to Servo min and Servo max
-    return pulse;
   }
+  //controllo sensori
+  int front_distance = sensore1.measureDistanceCm();
+  if(front_distance > 15 || front_distance == 0)
+      time_elapsed = millis();
+
+    
+  if ((millis()-time_elapsed)>1000) //mille millisecondi
+      invia_sensori();
 }
+

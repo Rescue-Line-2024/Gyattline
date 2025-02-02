@@ -10,7 +10,6 @@ class Robot:
     def __init__(self):
         self.stop_signal = False  # Segnale per terminare i thread
         self.lock = Lock()  # Lock per sincronizzare l'accesso ai dati condivisi
-        self.shared_message = None  # Messaggio condiviso tra i thread
 
         # Inizializza i thread
         self.serial_thread = Thread(target=self.serial_communication)
@@ -21,34 +20,26 @@ class Robot:
         self.camera_thread.start()
 
     def serial_communication(self):
-        """
-        Funzione che gestisce la comunicazione seriale.
-        """
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
 
         try:
             conn.open_connection()
 
             while not self.stop_signal:
-                # Leggi messaggi dalla seriale
                 response = conn.read_message()
                 if response:
-                    if response["action"] == "front_sensor":
-                        sensore = response["data"]
-                        Seguilinea.sensoreFrontale = sensore
-
+                    print(f"Ricevuto dall'arduino: {response}")
                     if response["action"] == "sensors":
-                        SDx = response["DX"]
-                        SSx = response["SX"]
-                        Seguilinea.sensoreDx = SDx
-                        Seguilinea.sensoreSx = SSx
-                    #print(f"Ricevuto dall'arduino: {response}")
-
-                # Invia messaggi se presenti
-                with self.lock:
-                    if self.shared_message:
-                        conn.send_message(self.shared_message)
-                        self.shared_message = None
+                        front_sensor = response["data"]["front"]
+                        left_sensor = response["data"]["left"]
+                        right_sensor = response["data"]["right"]
+                        print(f"Sensori: Front={front_sensor}, Left={left_sensor}, Right={right_sensor}")
+                
+                #USA SEGUILINEA.MESSAGGIO PER INVIARE QUALSIAASI COSA ALL'ARDUINO(IN FORMATO JSON)
+                if Seguilinea.messaggio is not None:
+                    conn.send_message(Seguilinea.messaggio)
+                    Seguilinea.messaggio = None
+                       
 
             conn.close_connection()
         except Exception as e:
@@ -88,25 +79,19 @@ class Robot:
                 #IL seguilinea tornerà un json con l'azione e il dato
                 
                 Line_follower.segui_linea(frame)
-                if Seguilinea.messaggio is not None:
-                    instruction = Seguilinea.messaggio
-                else:
-                    continue
-                    
-
-                # Condividi messaggi con il thread seriale
-                with self.lock:
-                    self.shared_message = instruction
 
                 # Mostra i frame
-                cv2.imshow("Camera principale", frame)
-                cv2.imshow("Rilevamento colori", frame_colori)
+                try:
+                    cv2.imshow("Camera principale", frame)
+                    cv2.imshow("Rilevamento colori", frame_colori)
+                except:
+                    pass
 
             
 
                 # Interrompi con il tasto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.shared_message = {"action" : "stop"}
+                    Seguilinea.messaggio = {"action" : "stop"}
                     self.stop_signal = True
                     break
         finally:

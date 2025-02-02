@@ -28,7 +28,7 @@ class RiconosciColori:
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         array = []
         for contour in contours:
-            if cv2.contourArea(contour) > self.min_area:
+            if cv2.contourArea(contour) > self.min_area/10:
                 x, y, w, h = cv2.boundingRect(contour)    
                 array.append([x, y, w, h])
         

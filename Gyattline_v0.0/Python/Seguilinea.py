@@ -152,7 +152,8 @@ class Seguilinea:
 
             #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti(si disattiva quando ci sono verdi)
             if points is not None and points  != 0 and points != 3:
-                if posizione_verdi is not None:
+                if posizione_verdi is not None and w<self.cam_x*0.5: 
+                    #se c'è l'intersezione sopra potrebbe raddrizzarsi in modo errato,ecco il perchè della seconda condizione
                     #SE C'è IL VERDE LA LINEA DEVE ESSERE PIU DRITTA POSSIBILE
                     current_PEN = self.PEN
                     self.PEN*=3
@@ -220,27 +221,29 @@ class Seguilinea:
         return deviazione * self.P2
 
     def gestisci_ostacoli(self,secondi_sleep):
-        if Seguilinea.sensoreFrontale is not None and Seguilinea.sensoreFrontale < 15:
+        if Seguilinea.sensoreFrontale is not None and Seguilinea.sensoreFrontale < 15 and Seguilinea.sensoreFrontale != 0:
             print("Ostacolo rilevato!")
-               
-            if posizione_linea is not None:
-                    
-                for i in range (10):
-                    Seguilinea.messaggio = {"action": "sensors", "data": " "} #aspettando l'arduino che torna
-                                                                              #i valori dei sensori dx e sx
+            for i in range (2):
+                Seguilinea.messaggio = {"action" : "motors", "data" : [0,0]}
+        
                 
-                if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
-                    print("Sensori laterali  non rilevati!")
-                    return
-                
+            for i in range (10):
+                Seguilinea.messaggio = {"action": "sensors", "data": " "} #aspettando l'arduino che torna
+                                                                            #i valori dei sensori dx e sx
 
-                direzione = "destra" if Seguilinea.sensoreDx > Seguilinea.sensoreSx else "sinistra"
-                print(f"Schivando ostacolo da {direzione}...")
+                #tutti i valori li carica il thread della connessione seriale nelle variabili di classe globali
+            if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
+                print("Sensori laterali  non rilevati!")
+                return
+            
+
+            direzione = "destra" if Seguilinea.sensoreDx > Seguilinea.sensoreSx else "sinistra"
+            print(f"Schivando ostacolo da {direzione}...")
+            
+            self.AvviaMotori(self.motor_limit, -self.motor_limit) if direzione == "destra" else self.AvviaMotori(-self.motor_limit, self.motor_limit)
+            time.sleep(secondi_sleep)
                 
-                self.AvviaMotori(self.motor_limit, -self.motor_limit) if direzione == "destra" else self.AvviaMotori(-self.motor_limit, self.motor_limit)
-                time.sleep(secondi_sleep)
-                    
-                    
+                
             while True:
                 ret,self.frame = self.cam.read()
                 posizione_linea = self.Colors_detector.riconosci_nero_tagliato(
@@ -253,9 +256,9 @@ class Seguilinea:
 
 
 
-                if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
-                    Seguilinea.messaggio = {"action": "sensors", "data": " "}
-                    continue
+                
+                Seguilinea.messaggio = {"action": "sensors", "data": " "}
+                    
                 
                 distanza_laterale = Seguilinea.sensoreSx if direzione == "destra" else Seguilinea.sensoreDx
 
@@ -276,9 +279,9 @@ class Seguilinea:
                 except:
                     logging.debug("probabilmente sei sul cmd,impossibile visualizzare il frame!")
 
-                
+            
 
-                    
+                
             Seguilinea.sensoreFrontale = None
             Seguilinea.sensoreDx = None
             Seguilinea.sensoreSx = None
