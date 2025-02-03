@@ -1,7 +1,7 @@
 import time
 
 class gpPID:
-    def __init__(self, P, I, D,inverted, setpoint = 0):
+    def __init__(self, P, I, D,inverted = 1, setpoint = 0):
         
         self.inverted = inverted
         self.motoreDX = None
