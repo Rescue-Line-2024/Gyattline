@@ -1,5 +1,0 @@
-classes = 2
-train = C:\CODING\Gyattline\test_model\dataset_new\images\train
-valid = C:\CODING\Gyattline\test_model\dataset_new\images\val
-nc: 2
-names = C:\CODING\Gyattline\test_model\dataset_new\classes.names
