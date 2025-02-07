@@ -96,7 +96,7 @@ class Seguilinea:
                     for verde in posizione_verdi:
                         Gx,Gy,Gw,Gh = verde["coords"]
                         print(f"{Gy+Gh} > {self.cam_y*0.75}")
-                        if Gy+Gh > self.cam_y*0.75: #se il verde si trova nell 1/4 piu basso della telecamera
+                        if Gy+Gh > self.cam_y*0.7: #se il verde si trova nell 1/4 piu basso della telecamera
                             #se il verde si trova nell'area di interesse, lo aggiungo alla lista
                             verdi_da_considerare.append(verde)
 
@@ -107,11 +107,15 @@ class Seguilinea:
             
                         if posizione == "DX":
                             print("GIRA A DESTRA!verde")
-                            Seguilinea.messaggio = {"action" : "motors","data" : [30,0]}
+                            self.deviazione = self.calcola_deviazione(x+w,h)
+                            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
+                            Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
                             return
                         if posizione == "SX":
                             print("GIRA A SINISTRA!verde")
-                            Seguilinea.messaggio = {"action" : "motors","data" : [0,30]} 
+                            self.deviazione = self.calcola_deviazione(x,h)
+                            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
+                            Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]} 
                             return
 
                     if len(verdi_da_considerare) == 2:
