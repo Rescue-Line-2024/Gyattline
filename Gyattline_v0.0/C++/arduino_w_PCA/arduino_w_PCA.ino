@@ -1,172 +1,226 @@
 #include <Adafruit_PWMServoDriver.h>
 #include <Wire.h>
 #include <ArduinoJson.h>  // Include la libreria ArduinoJson
-Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);  // called this way, it uses the default address 0x40  
 
+// Inizializzazione del driver PWM (indirizzo di default 0x40)
+Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);
 
-#define SERVOMIN  100   // Adjust according to your servo
-#define SERVOMAX  600   // Adjust according to your servo
-#define Muro_trig 5
-#define Muro_echo 6
-#define Ostacolo_trig 3
-#define Ostacolo_echo 4
-#define IN_A0  A1
+// --------------------------
+// COSTANTI E DEFINIZIONI
+// --------------------------
+#define SERVOMIN  100   // Valore minimo per il servo (da regolare)
+#define SERVOMAX  600   // Valore massimo per il servo (da regolare)
 
-long durata,cm,durata2,cm2,rifrazione,err;
-int Deviazione,c=0,last_error = 0;
-int timer = millis();
-bool ag = false;
+// --------------------------
+// CONFIGURAZIONE DEI SENSORI ULTRASONICI
+// I sensori verranno letti nei seguenti pin:
+// - Sensore Frontale:  trig = 3,  echo = 4
+// - Sensore Destro:     trig = 5,  echo = 6
+// - Sensore Sinistro:   trig = 8,  echo = 7
+// --------------------------
+#define FRONT_TRIG 3
+#define FRONT_ECHO 4
 
-//MOTORI ANTERIORI
-void AvviaServoAvanti(int speed,int speed2) {
-  // Set PWM to control the speed and direction of the continuous rotation servo
+#define RIGHT_TRIG 5
+#define RIGHT_ECHO 6
+
+#define LEFT_TRIG 8
+#define LEFT_ECHO 7
+
+#define IN_A0  A1  // (Non modificato; verificare se è effettivamente usato)
+
+// --------------------------
+// VARIABILI PER IL MONITORAGGIO DEL SENSORE FRONTANALE
+// --------------------------
+unsigned long frontBelowThresholdStart = 0;
+bool frontBelowThresholdNotified = false;
+
+// --------------------------
+// FUNZIONI DI CONTROLLO DEI MOTORI
+// --------------------------
+void AvviaServoAvanti(int speed, int speed2) {
+  // Imposta il PWM per controllare i servomotori a rotazione continua
   board1.setPWM(0, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
   board1.setPWM(1, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
 }
-//MOTORI POSTERIORI
-void AvviaServoIndietro(int speed,int speed2)
-{
+
+void AvviaServoIndietro(int speed, int speed2) {
   board1.setPWM(2, 0, map(speed, -100, 100, SERVOMIN, SERVOMAX));
   board1.setPWM(3, 0, map(speed2, -100, 100, SERVOMIN, SERVOMAX));
 }
 
-void AvviaMotori(int DX,int SX,int lim = 100)
-{
+void AvviaMotori(int DX, int SX, int lim = 100) {
+  int potenzaDX = constrain(DX, -lim, lim);
+  int potenzaSX = constrain(SX, -lim, lim);
 
-  int potenzaDX = DX;
-  int potenzaSX = SX;
+  // Avvia i motori anteriori (aggiunge un offset di 10 per compensare eventuali disallineamenti)
+  AvviaServoAvanti(potenzaDX + 10, -potenzaSX + 10);
 
-  potenzaDX = constrain(potenzaDX, -lim, lim);
-  potenzaSX = constrain(potenzaSX,-lim,lim);
-
-
-  AvviaServoAvanti(potenzaDX+10,-1*(potenzaSX)+10);
-
-
+  // Avvia i motori posteriori: qui si impone che la velocità sia non negativa
   potenzaDX = constrain(potenzaDX, 0, lim);
-  potenzaSX = constrain(potenzaSX,0,lim);
-
-
-  AvviaServoIndietro(potenzaDX+10,-1*(potenzaSX)+10);
-}
-void stop()
-{
-    AvviaServoAvanti(10,10);
-    AvviaServoIndietro(10,10);
-}
-void setup() {
-  Serial.begin(115200);
-  cm = 1000;
-  board1.begin();
-  board1.setPWMFreq(60);      
-  AvviaServoAvanti(10,10);
-  AvviaServoIndietro(10,10);
- 
-  pinMode (IN_A0,INPUT);
-
-
-  pinMode(Muro_trig, OUTPUT);
-  pinMode(Muro_echo, INPUT);
-
-  pinMode(Ostacolo_trig,OUTPUT);
-  pinMode(Ostacolo_echo,INPUT);
-
-  impostaservo(145,4); //TILT (160 per il seguilinea,115 per le palline)
-  impostaservo(95,15);
- 
-  gestiscibraccio(200); //braccio sopra
-  apribracci();
-
+  potenzaSX = constrain(potenzaSX, 0, lim);
+  AvviaServoIndietro(potenzaDX + 10, -potenzaSX + 10);
 }
 
-
-
-
-
-void apribracci()
-{
-  impostaservo(20,13);  //20 aperto 70 chiuso
-  impostaservo(180,14); //180 aperto 135 chiuso
-}
-void chiudibracci()
-{
-  impostaservo(60,13);  //20 aperto 70 chiuso
-  impostaservo(60,14); //180 aperto 135 chiuso
+void stop() {
+  AvviaServoAvanti(10, 10);
+  AvviaServoIndietro(10, 10);
 }
 
-void impostaservo(int gradi,int pin){board1.setPWM(pin, 0, angleToPulse(gradi) );}
-
-void gestiscibraccio(int gradi)
-{
-  impostaservo(180-gradi,9);
-  impostaservo(gradi,8);
+// --------------------------
+// FUNZIONI PER IL CONTROLLO DEI SERVOMOTORI (BRACCIO, TILT, ecc.)
+// --------------------------
+void impostaservo(int gradi, int pin) {
+  board1.setPWM(pin, 0, angleToPulse(gradi));
 }
 
-
-String Message;
-
-
-
-
-
-
-
-int timer1 = millis();
-
-String Action;
-int MotoreDX,MotoreSX;
-void loop() {
-
-
-  if (Serial.available() > 0) {
-
-    Message = Serial.readStringUntil('\n');
-
-    StaticJsonDocument<200> doc;  // Creazione di un buffer JSON
-
-    DeserializationError error = deserializeJson(doc, Message);
-
-    if (error) {
-      Serial.print("Errore nella deserializzazione: ");
-      Serial.println(error.c_str());
-      return;  // Esci se c'è un errore
-    }
-
-    Action = doc["action"].as<String>();  // Ottiene il valore associato alla chiave "comando"
-    
-
-    
-    if(Action == "motors")
-        {
-        MotoreDX = doc["data"][0];
-        MotoreSX = doc["data"][1];
-        AvviaMotori(MotoreDX,MotoreSX);
-        }
-
-    
-    
-  }
+void gestiscibraccio(int gradi) {
+  impostaservo(180 - gradi, 9);
+  impostaservo(gradi, 8);
 }
 
+void apribracci() {
+  impostaservo(20, 13);   // 20: braccio aperto (70: chiuso)
+  impostaservo(180, 14);  // 180: aperto (135: chiuso)
+}
 
+void chiudibracci() {
+  impostaservo(60, 13);   // 60: posizione per chiudere (rispetto a 20 aperto e 70 chiuso)
+  impostaservo(60, 14);
+}
 
+// Converte un angolo (0-180) in un valore di pulse per il servo
+int angleToPulse(int ang) {
+  int pulse = map(ang, 0, 180, SERVOMIN, SERVOMAX);
+  return pulse;
+}
 
-
-int CheckDistanza(int trig,int echo)
-{
+// --------------------------
+// FUNZIONE PER LA LETTURA DEI SENSORI ULTRASONICI
+// --------------------------
+int CheckDistanza(int trig, int echo) {
   digitalWrite(trig, LOW);
   delayMicroseconds(2);
   digitalWrite(trig, HIGH);
   delayMicroseconds(10);
   digitalWrite(trig, LOW);
-  int durata = pulseIn(echo, HIGH);
-  int cm = durata / 58;
-  return cm;
+  long durata = pulseIn(echo, HIGH);
+  int distanza = durata / 58;  // Conversione in centimetri (approssimativa)
+  return distanza;
 }
 
+// --------------------------
+// VARIABILI PER LA COMUNICAZIONE SERIAL
+// --------------------------
+String Message;
+String Action;
+int MotoreDX, MotoreSX;
 
+// --------------------------
+// SETUP
+// --------------------------
+void setup() {
+  Serial.begin(115200);
+  
+  // Inizializza il driver PWM
+  board1.begin();
+  board1.setPWMFreq(60);      
+  AvviaServoAvanti(10, 10);
+  AvviaServoIndietro(10, 10);
+ 
+  // Configurazione del pin analogico (se necessario)
+  pinMode(IN_A0, INPUT);
 
-int angleToPulse(int ang){
-   int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);// map angle of 0 to 180 to Servo min and Servo max
-   return pulse;
+  // Configura i pin dei sensori ad ultrasuoni
+  // Sensore frontale
+  pinMode(FRONT_TRIG, OUTPUT);
+  pinMode(FRONT_ECHO, INPUT);
+  // Sensore destro
+  pinMode(RIGHT_TRIG, OUTPUT);
+  pinMode(RIGHT_ECHO, INPUT);
+  // Sensore sinistro
+  pinMode(LEFT_TRIG, OUTPUT);
+  pinMode(LEFT_ECHO, INPUT);
+
+  // Inizializzazione di alcuni servomotori (es. TILT e braccio)
+  impostaservo(145, 4); // Esempio: 145 gradi per il TILT (altri valori possibili in base all'applicazione)
+  impostaservo(95, 15);
+ 
+  gestiscibraccio(200); // Posiziona il braccio in alto
+  apribracci();        // Apre i bracci
+}
+
+// --------------------------
+// LOOP PRINCIPALE
+// --------------------------
+void loop() {
+  // ----- Gestione dei comandi in arrivo via Serial -----
+  if (Serial.available() > 0) {
+    Message = Serial.readStringUntil('\n');
+
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, Message);
+    if (error) {
+      Serial.print("Errore nella deserializzazione: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    Action = doc["action"].as<String>();
+    
+    // Comando per controllare i motori
+    if (Action == "motors") {
+      MotoreDX = doc["data"][0];
+      MotoreSX = doc["data"][1];
+      AvviaMotori(MotoreDX, MotoreSX);
+    }
+    
+    if (Action == "stop") {
+      AvviaMotori(0, 0);
+    }
+    
+    // Comando per richiedere i dati dei sensori
+    if (Action == "get_sensors") {
+      int frontDistance = CheckDistanza(FRONT_TRIG, FRONT_ECHO);
+      int rightDistance = CheckDistanza(RIGHT_TRIG, RIGHT_ECHO);
+      int leftDistance  = CheckDistanza(LEFT_TRIG, LEFT_ECHO);
+      
+      StaticJsonDocument<200> response;
+      response["front"] = frontDistance;
+      response["right"] = rightDistance;
+      response["left"]  = leftDistance;
+      
+      serializeJson(response, Serial);
+      Serial.println();
+    }
+  }
+  
+  // ----- Monitoraggio continuo del sensore frontale -----
+  int currentFrontDistance = CheckDistanza(FRONT_TRIG, FRONT_ECHO);
+  if (currentFrontDistance < 20) {
+    // Se la distanza è inferiore a 20 cm, avvia (o continua) il timer
+    if (frontBelowThresholdStart == 0) {
+      frontBelowThresholdStart = millis();
+    }
+    else if (millis() - frontBelowThresholdStart >= 2000 && !frontBelowThresholdNotified) {
+      // Se la condizione persiste per 2 secondi, invia automaticamente i dati dei sensori
+      int rightDistance = CheckDistanza(RIGHT_TRIG, RIGHT_ECHO);
+      int leftDistance  = CheckDistanza(LEFT_TRIG, LEFT_ECHO);
+      
+      StaticJsonDocument<200> alertDoc;
+      alertDoc["front"] = currentFrontDistance;
+      alertDoc["right"] = rightDistance;
+      alertDoc["left"]  = leftDistance;
+      
+      serializeJson(alertDoc, Serial);
+      Serial.println();
+      
+      frontBelowThresholdNotified = true;  // Impedisce invii ripetuti continui
+    }
+  } 
+  else {
+    // Se la distanza torna sopra 20 cm, resetta il timer e il flag
+    frontBelowThresholdStart = 0;
+    frontBelowThresholdNotified = false;
+  }
 }

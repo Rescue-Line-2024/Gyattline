@@ -21,25 +21,37 @@ class Robot:
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
-
         try:
             conn.open_connection()
-
+            
             while not self.stop_signal:
+                # Lettura di eventuali messaggi in arrivo dall'Arduino
                 response = conn.read_message()
                 if response:
-                    print(f"Ricevuto dall'arduino: {response}")
-                    if response["action"] == "sensors":
-                        front_sensor = response["data"]["front"]
-                        left_sensor = response["data"]["left"]
-                        right_sensor = response["data"]["right"]
-                        print(f"Sensori: Front={front_sensor}, Left={left_sensor}, Right={right_sensor}")
+                    try:
+                        # Se il messaggio contiene i dati dei sensori (Arduino non include "action" in questi messaggi)
+                        if "front" in response and "left" in response and "right" in response:
+                            front_sensor = response["front"]
+                            left_sensor = response["left"]
+                            right_sensor = response["right"]
+                            print(f"Sensori: Front={front_sensor}, Left={left_sensor}, Right={right_sensor}")
+                            Seguilinea.sensoreFrontale = front_sensor
+                            Seguilinea.sensoreSx = left_sensor
+                            Seguilinea.sensoreDx = right_sensor
+                        # Gestione di altri tipi di messaggi (ad esempio, comandi o notifiche)
+                        elif "action" in response:
+                            if response["action"] == "stop":
+                                print("Ricevuto comando di stop dall'Arduino")
+                            else:
+                                print(f"Messaggio ricevuto: {response}")
+                    except Exception as e:
+                        print("Errore nel parsing del messaggio:", e)
                 
-                #USA SEGUILINEA.MESSAGGIO PER INVIARE QUALSIAASI COSA ALL'ARDUINO(IN FORMATO JSON)
+                
+                # Se è presente un messaggio impostato dal modulo Seguilinea, invialo all'Arduino
                 if Seguilinea.messaggio is not None:
                     conn.send_message(Seguilinea.messaggio)
                     Seguilinea.messaggio = None
-                       
 
             conn.close_connection()
         except Exception as e:

@@ -224,72 +224,102 @@ class Seguilinea:
         logging.debug(f"deviazione={deviazione} , moltiplicatore={multiplicator_h}")
         return deviazione * self.P2
 
-    def gestisci_ostacoli(self,secondi_sleep):
-        if Seguilinea.sensoreFrontale is not None and Seguilinea.sensoreFrontale < 15 and Seguilinea.sensoreFrontale != 0:
+    def gestisci_ostacoli(self, secondi_sleep):
+        # Verifica se il sensore frontale (aggiornato dall'Arduino) rileva un ostacolo (valore valido e inferiore a 15 cm)
+        if (Seguilinea.sensoreFrontale is not None and 
+            0 < Seguilinea.sensoreFrontale < 15):
             print("Ostacolo rilevato!")
-            for i in range (2):
-                Seguilinea.messaggio = {"action" : "motors", "data" : [0,0]}
-        
-                
-            for i in range (10):
-                Seguilinea.messaggio = {"action": "sensors", "data": " "} #aspettando l'arduino che torna
-                                                                            #i valori dei sensori dx e sx
-
-                #tutti i valori li carica il thread della connessione seriale nelle variabili di classe globali
+            
+            # Manda più volte il comando per fermare i motori (eventualmente con una breve pausa)
+            for i in range(2):
+                Seguilinea.messaggio = {"action": "motors", "data": [0, 0]}
+                time.sleep(0.05)  # breve delay per garantire la ricezione
+            
+            # Richiedi i dati dai sensori laterali per aggiornare i valori
+            # Invece di inviare 10 richieste in rapida successione, si potrebbe inviare una richiesta e attendere l'aggiornamento
+            for i in range(3):
+                Seguilinea.messaggio = {"action": "sensors", "data": " "}
+                time.sleep(0.1)  # breve pausa per permettere all'Arduino di rispondere
+            
+            # Se non sono disponibili i dati dei sensori laterali, esce dalla routine
             if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
-                print("Sensori laterali  non rilevati!")
+                print("Sensori laterali non rilevati!")
                 return
             
-
+            # Sceglie la direzione in base a quale sensore laterale mostra maggiore distanza.
+            # Se il sensore destro ha un valore maggiore, allora c'è più spazio a destra
             direzione = "destra" if Seguilinea.sensoreDx > Seguilinea.sensoreSx else "sinistra"
+
+            #in caso uno dei due non funzioni,allora si va nella direzione opposta
+            if Seguilinea.sensoreDx < 1:
+                direzione = "sinistra"
+            elif Seguilinea.sensoreSx < 1:
+                direzione = "destra"
+
+
             print(f"Schivando ostacolo da {direzione}...")
             
-            self.AvviaMotori(self.motor_limit, -self.motor_limit) if direzione == "destra" else self.AvviaMotori(-self.motor_limit, self.motor_limit)
-            time.sleep(secondi_sleep)
-                
-                
+            # Il comando iniziale di rotazione: gira in base alla direzione scelta.
+            # Qui viene inviato un comando per girare in loco (motori in direzioni opposte)
+            if direzione == "destra":
+                self.AvviaMotori(self.motor_limit, -self.motor_limit)
+            else:
+                self.AvviaMotori(-self.motor_limit, self.motor_limit)
+            
+            time.sleep(secondi_sleep)  # Attende per un tempo prestabilito per effettuare la rotazione
+            
+            # Loop di correzione finché non si "ritrova" la linea (verifica in base al riconoscimento della linea)
             while True:
-                ret,self.frame = self.cam.read()
+                ret, self.frame = self.cam.read()
+                if not ret:
+                    print("Impossibile leggere il frame dalla camera.")
+                    break
+                
+                # Rileva la linea (parte tagliata in basso) per capire se l'ostacolo è stato superato
                 posizione_linea = self.Colors_detector.riconosci_nero_tagliato(
                     image=self.frame, frame_height=self.cam_y, cut_percentage=self.cut_percentage
                 )
                 if posizione_linea is not None:
-                    x, y, w, h = posizione_linea[0]  
+                    x, y, w, h = posizione_linea[0]
                 else:
-                    w = 0
-
-
-
+                    w = 0  # Se non viene rilevata la linea, consideriamo la larghezza pari a zero
                 
+                # Richiedi aggiornamento dei sensori
                 Seguilinea.messaggio = {"action": "sensors", "data": " "}
-                    
                 
-                distanza_laterale = Seguilinea.sensoreSx if direzione == "destra" else Seguilinea.sensoreDx
-
-                deviazione = self.Pid_muro.calcolopid(distanza_laterale) #
-                self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione)
-                self.AvviaMotori(self.motoreDX,self.motoreSX)
+                # Correzione PID: usa il sensore laterale del lato verso cui stiamo girando
+                # Correzione: se si gira a destra, si usa il sensore destro; se a sinistra, si usa il sensore sinistro
+                distanza_laterale = Seguilinea.sensoreDx if direzione == "destra" else Seguilinea.sensoreSx
+                
+                deviazione = self.Pid_muro.calcolopid(distanza_laterale)
+                
+                # Calcola la potenza motore utilizzando il PID di follow (eventualmente si potrebbe usare una funzione dedicata)
+                self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione)
+                self.AvviaMotori(self.motoreDX, self.motoreSX)
                 logging.debug(f"deviazione con muro: {deviazione}")
-
-                if w > self.cam_x//0.3:
-                    print("ostacolo schivato!")
+                
+                # La condizione per uscire dal loop può essere basata sul riconoscimento della linea:
+                # Ad esempio, se la larghezza del bounding box rilevato supera una certa soglia.
+                # Nota: al posto di 'self.cam_x//0.3' si usa il prodotto per una soglia in percentuale.
+                if w > self.cam_x * 0.3:
+                    print("Ostacolo schivato!")
                     break
-                    
+                
+                # Permette di uscire se viene premuto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-
-                try:
-                    cv2.imshow("visuale ostacolo",self.frame)
-                except:
-                    logging.debug("probabilmente sei sul cmd,impossibile visualizzare il frame!")
-
-            
-
                 
+                try:
+                    cv2.imshow("visuale ostacolo", self.frame)
+                except Exception as e:
+                    logging.debug(f"Impossibile visualizzare il frame: {e}")
+            
+            # Reset delle variabili sensoriali per evitare ulteriori trigger indesiderati
             Seguilinea.sensoreFrontale = None
             Seguilinea.sensoreDx = None
             Seguilinea.sensoreSx = None
             cv2.destroyAllWindows()
+
 
  
         
