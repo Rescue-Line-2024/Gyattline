@@ -15,17 +15,17 @@ Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);
 // CONFIGURAZIONE DEI SENSORI ULTRASONICI
 // I sensori verranno letti nei seguenti pin:
 // - Sensore Frontale:  trig = 3,  echo = 4
-// - Sensore Destro:     trig = 5,  echo = 6
-// - Sensore Sinistro:   trig = 8,  echo = 7
+// - Sensore Destro:     trig = 8,  echo = 7
+// - Sensore Sinistro:   trig = 5,  echo = 6
 // --------------------------
 #define FRONT_TRIG 3
 #define FRONT_ECHO 4
 
-#define RIGHT_TRIG 5
-#define RIGHT_ECHO 6
+#define RIGHT_TRIG 8
+#define RIGHT_ECHO 7
 
-#define LEFT_TRIG 8
-#define LEFT_ECHO 7
+#define LEFT_TRIG 5
+#define LEFT_ECHO 6
 
 #define IN_A0  A1  // (Non modificato; verificare se è effettivamente usato)
 
@@ -202,7 +202,7 @@ void loop() {
     if (frontBelowThresholdStart == 0) {
       frontBelowThresholdStart = millis();
     }
-    else if (millis() - frontBelowThresholdStart >= 2000 && !frontBelowThresholdNotified) {
+    else if (millis() - frontBelowThresholdStart >= 500 && !frontBelowThresholdNotified) {
       // Se la condizione persiste per 2 secondi, invia automaticamente i dati dei sensori
       int rightDistance = CheckDistanza(RIGHT_TRIG, RIGHT_ECHO);
       int leftDistance  = CheckDistanza(LEFT_TRIG, LEFT_ECHO);

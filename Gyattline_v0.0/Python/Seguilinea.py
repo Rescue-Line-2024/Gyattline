@@ -35,7 +35,7 @@ class Seguilinea:
         self.cut_y = None
 
         self.Pid_follow = gpPID(P,I,D,-1, int(self.cam_x/2)) 
-        self.Pid_muro = gpPID(P,I,D,-1,int(7))
+        self.Pid_muro = gpPID(20,0,0,-1,12)
 
         self.cut_tresh = None
 
@@ -194,10 +194,6 @@ class Seguilinea:
 
         else:
             pass
-        
-        if self.motoreDX and self.motoreSX:
-            self.motoreDX = self.limit_motor(self.motoreDX)
-            self.motoreSX = self.limit_motor(self.motoreSX)
 
         self.AvviaMotori(self.motoreDX,self.motoreSX)
 
@@ -216,7 +212,7 @@ class Seguilinea:
 
 
 
-
+    
     def calcola_deviazione(self, centro_linea_x, altezza_bbox):
         deviazione = self.Pid_follow.calcolopid(centro_linea_x)
         multiplicator_h = max(0.01, altezza_bbox / self.cut_y)  # Evita divisione per 0
@@ -261,6 +257,9 @@ class Seguilinea:
             
             # Il comando iniziale di rotazione: gira in base alla direzione scelta.
             # Qui viene inviato un comando per girare in loco (motori in direzioni opposte)
+            self.AvviaMotori(-self.motor_limit,-self.motor_limit)
+            time.sleep(secondi_sleep) #vai un pò indietro
+            
             if direzione == "destra":
                 self.AvviaMotori(self.motor_limit, -self.motor_limit)
             else:
@@ -285,13 +284,15 @@ class Seguilinea:
                     w = 0  # Se non viene rilevata la linea, consideriamo la larghezza pari a zero
                 
                 # Richiedi aggiornamento dei sensori
-                Seguilinea.messaggio = {"action": "sensors", "data": " "}
+                Seguilinea.messaggio = {"action": "get_sensors", "data": " "}
                 
                 # Correzione PID: usa il sensore laterale del lato verso cui stiamo girando
                 # Correzione: se si gira a destra, si usa il sensore destro; se a sinistra, si usa il sensore sinistro
                 distanza_laterale = Seguilinea.sensoreDx if direzione == "destra" else Seguilinea.sensoreSx
                 
                 deviazione = self.Pid_muro.calcolopid(distanza_laterale)
+
+                deviazione = np.clip(deviazione,-100,100) #non facciamo girare il robot troppo!
                 
                 # Calcola la potenza motore utilizzando il PID di follow (eventualmente si potrebbe usare una funzione dedicata)
                 self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione)
@@ -449,6 +450,8 @@ class Seguilinea:
             return None
     
     def AvviaMotori(self,DX,SX):
+        DX = self.limit_motor(DX)
+        SX = self.limit_motor(SX)
         Seguilinea.messaggio = {"action" : "motors","data" : [DX,SX]}
 
 
