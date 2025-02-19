@@ -2,6 +2,7 @@ from threading import Thread, Lock
 from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
 from ric_colori import RiconosciColori
 from Seguilinea import Seguilinea
+from ArduinoManager import ArduinoManager
 import cv2
 import time
 
@@ -35,9 +36,9 @@ class Robot:
                             left_sensor = response["left"]
                             right_sensor = response["right"]
                             print(f"Sensori: Front={front_sensor}, Left={left_sensor}, Right={right_sensor}")
-                            Seguilinea.sensoreFrontale = front_sensor
-                            Seguilinea.sensoreSx = left_sensor
-                            Seguilinea.sensoreDx = right_sensor
+                            ArduinoManager.front_sensor = front_sensor
+                            ArduinoManager.left_sensor = left_sensor
+                            ArduinoManager.right_sensor = right_sensor
                         # Gestione di altri tipi di messaggi (ad esempio, comandi o notifiche)
                         elif "action" in response:
                             if response["action"] == "stop":
@@ -49,9 +50,9 @@ class Robot:
                 
                 
                 # Se è presente un messaggio impostato dal modulo Seguilinea, invialo all'Arduino
-                if Seguilinea.messaggio is not None:
-                    conn.send_message(Seguilinea.messaggio)
-                    Seguilinea.messaggio = None
+                if ArduinoManager.message is not None:
+                    conn.send_message(ArduinoManager.message)
+                    ArduinoManager.message = None
 
             conn.close_connection()
         except Exception as e:
@@ -75,7 +76,19 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        Line_follower = Seguilinea(cam=cam,P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=50, cam_resolution=(width, height),motor_limit = 40)
+            # Imposta i parametri del PID, ad esempio (P, I, D)
+        pid_params = (3, 0, 0)
+        # Crea l'istanza del SeguiLinea
+        Line_follower = Seguilinea(
+            cam=cam,
+            pid_params=pid_params,
+            P2=1,
+            pen_multiplier=0.5,
+            cam_resolution=(width, height),
+            min_area=50,
+            cut_percentage=0.6,
+            motor_limit=40
+        )
         
         
         
@@ -90,7 +103,7 @@ class Robot:
 
                 #IL seguilinea tornerà un json con l'azione e il dato
                 
-                Line_follower.segui_linea(frame)
+                Line_follower.follow_line(frame)
 
                 # Mostra i frame
                 try:
@@ -103,7 +116,7 @@ class Robot:
 
                 # Interrompi con il tasto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    Seguilinea.messaggio = {"action" : "stop"}
+                    ArduinoManager.message = {"action" : "stop"}
                     self.stop_signal = True
                     break
         finally:

@@ -1,459 +1,148 @@
 import cv2
 import numpy as np
-from PID import gpPID
-from ric_colori import RiconosciColori
 import time
 import logging
-logging.basicConfig(level=logging.DEBUG)
+from PID import gpPID
+from ric_colori import RiconosciColori
+from ArduinoManager import ArduinoManager
+from LineGreenAnalyzer import LineGreenAnalyzer
+from PID_manager import PIDManager
 
-
+#############################################
+#              SeguiLinea                 #
+#############################################
 class Seguilinea:
-    messaggio = None
-    sensoreFrontale = None
-    sensoreDx = None
-    sensoreSx = None
-    def __init__(self,cam,P,I,D,P2,PEN,cam_resolution,min_area=200,cut_percentage=0.6,motor_limit=30):
+    """
+    Classe principale che coordina:
+     - L'analisi immagine (linea e marker verdi)
+     - I calcoli PID per il follow della linea
+     - La comunicazione con l'Arduino per comandare i motori
+    """
+    def __init__(self, cam, pid_params, P2, pen_multiplier, cam_resolution,
+                 min_area=200, cut_percentage=0.6, motor_limit=30):
         self.cam = cam
-
-        self.BLUE = ([100, 150, 0], [140, 255, 255])  # Intervallo HSV per il blu
-        self.GREEN = ([35, 100, 50], [85, 255, 255])  # Intervallo HSV per il verde
-
-        #PER ADESSO HO MESSO IL BLU PER MANCANZA DI NASTRO VERDE,CAMBIARE I VALORI
-        self.min_area = min_area
-        self.Colors_detector = RiconosciColori(self.GREEN[0],self.GREEN[1],self.min_area)
-
-        self.P,self.I,self.D = P , I , D #primo pid:calcolo distanza dalla linea
-        self.PEN = PEN
-        self.P2 = P2
-        self.motor_limit = motor_limit
-        self.motoreDX,self.motoreSX = 0,0
         self.cut_percentage = cut_percentage
         self.cam_x = int(cam_resolution[0])
         self.cam_y = int(cam_resolution[1])
-
-        self.cut_x = None
+        self.motor_limit = motor_limit
         self.cut_y = None
+        # Inizializza i manager
+        self.arduino_manager = ArduinoManager(motor_limit=motor_limit)
+        P, I, D = pid_params
+        self.pid_manager = PIDManager(P, I, D, setpoint=int(self.cam_x/2), P2=P2, pen_multiplier=pen_multiplier)
+        self.line_analyzer = LineGreenAnalyzer(min_area=min_area)
+        self.last_green_direction = None
+        self.avoiding_obstacle = False
 
-        self.Pid_follow = gpPID(P,I,D,-1, int(self.cam_x/2)) 
-        self.Pid_muro = gpPID(20,0,0,-1,12)
+    def follow_line(self, frame):
+        frame_height, frame_width = frame.shape[:2]
+        # Rileva la linea nell'immagine completa (o in quella tagliata)
+        line_bboxes = self.line_analyzer.detect_line(frame, frame_height, self.cut_percentage)
 
-        self.cut_tresh = None
-
-        self.frame = None
-        self.pendenza,self.deviazione = None,None
-
-    def segui_linea(self,frame):
-        self.frame = frame
-        frame_height = frame.shape[0]
-        frame_width = frame.shape[1]
-
-        frame_cut = frame[int(frame_height*self.cut_percentage):frame_height, :].copy()  # Leggi il frame dalla camera
-        
-        
-
-        self.cut_y = frame_cut.shape[0]
-        self.cut_x = frame_cut.shape[1]
-        #Ricorda che ogni volta che chiami questa funzione il tresh globale di riconosci colori si aggiorna
-
-        '''
-        Con .copy(), crei un array completamente nuovo e separato,
-        quindi eventuali modifiche a self.cut_tresh non influenzeranno RiconosciColori.thresh.
-        '''
-                
-
-
-        posizione_linea = self.Colors_detector.riconosci_nero_tagliato(image=self.frame,frame_height=frame_height,cut_percentage=self.cut_percentage) #ci facciamo tornare direttamente le bbox
-        self.cut_tresh = RiconosciColori.thresh[int(frame_height*self.cut_percentage):frame_height, :].copy()
-        
-        
-        
-        #OGNI VOLTA CHE SI FA RICONOSCIMENTO NERO,VIENE SALVATO IN UNA VARIABILE DI CLASSE DI RICONOSCICOLORI
-        #IL TRESH TOTALE DI TUTTO IL FRAME DEL NERO 
-
-        nero_coords = None
-
-        
-
-        if posizione_linea is not None:
-            #----------CALCOLO PRIMO PID---------------#
-
-            self.gestisci_ostacoli(secondi_sleep=1)
-                
-
-            x, y, w, h = posizione_linea[0]
+        if line_bboxes is not None:
+            # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
+            self.cut_y = self.line_analyzer.binary_mask.shape[0]
             
-            #la y del frame originale
-            y_original = y + int(self.cam_y*self.cut_percentage)
-            posizione_linea[0] = (x,y_original,w,h) #queste sono le coordinate assolute,le useremo per disegnare
-            nero_coords = (x,y,w,h)#queste sono le coordinate relative con cui lavoreremo
-            
-            #self.Colors_detector.disegna_bbox((posizione_linea[0],),frame,(0,0,0))
+            # Prendi la prima bounding box rilevata
+            x, y, w, h = line_bboxes[0]
+            # Ripristino la coordinata y nel sistema completo
+            y_original = y + int(self.cam_y * self.cut_percentage)
+            adjusted_bbox = (x, y_original, w, h)
+            nero_coords = (x, y, w, h)  # coordinate relative per ulteriori elaborazioni
 
-            #-----VERDI----#
-            posizione_verdi = self.Colors_detector.riconosci_verdi(image=self.frame)
-            if posizione_verdi is not None:
-                    verdi_da_considerare = [] #vengono presi in considerazione solo i verdi piu bassi
-                    for verde in posizione_verdi:
-                        Gx,Gy,Gw,Gh = verde["coords"]
-                        print(f"{Gy+Gh} > {self.cam_y*0.75}")
-                        if Gy+Gh > self.cam_y*0.7: #se il verde si trova nell 1/4 piu basso della telecamera
-                            #se il verde si trova nell'area di interesse, lo aggiungo alla lista
-                            verdi_da_considerare.append(verde)
+            # Gestione ostacoli (se i sensori li segnalano)
+            if(self.arduino_manager.handle_obstacle(1) == True):
+                #incomincia schivata ostacolo
+                self.avoiding_obstacle = True
 
-                    #ORA VEDIAMO QUANTI  VERDI SONO RIMASTI
-                    print("VERDI :",verdi_da_considerare)
-                    if len(verdi_da_considerare) == 1:
-                        posizione = verdi_da_considerare[0]["position"]
-            
-                        if posizione == "DX":
-                            print("GIRA A DESTRA!verde")
-                            self.deviazione = self.calcola_deviazione(x+w,h)
-                            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
-                            Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]}
-                            return
-                        if posizione == "SX":
-                            print("GIRA A SINISTRA!verde")
-                            self.deviazione = self.calcola_deviazione(x,h)
-                            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
-                            Seguilinea.messaggio = {"action" : "motors","data" : [self.motoreDX,self.motoreSX]} 
-                            return
-
-                    if len(verdi_da_considerare) == 2:
-                        print("DOPPIO!")
-
-                        
-
-
-            #-----VERDI----#
-
-            A = (x,y)
-            B = (x+w,y+h)
-                    # Calcola centro in modo sicuro
-            try:
-                Centerx_Abs = (x + x + w) // 2
-                Centery_Abs = (y + y + h) // 2
-                
-                
-                
-        
-            except Exception as e:
-                print(f"Errore nel calcolo del centro assoluto: {e}")
-
-
-            #PRIMO PID : (guarda giu nell if)
-
-            #SECONDO PID : DISTANZA DAL PUNTO Csup E DAL PUNTO Cinf
-            #Cinf è il punto in cui inizia la linea,Csup dove finisce
-
-            
-
-            '''
-            la pendenza ci serve per capire se è piu urgente
-            #raddrizzare la posizione della linea o seguirla
-            '''
-        
-            points = self.TrovaCentriLinea(10,0)
-
-            #trovacentrilinea torna 0 quando sono stati rilevati una quantità diversa da due punti(si disattiva quando ci sono verdi)
-            if points is not None and points  != 0 and points != 3:
-                if posizione_verdi is not None and w<self.cam_x*0.5: 
-                    #se c'è l'intersezione sopra potrebbe raddrizzarsi in modo errato,ecco il perchè della seconda condizione
-                    #SE C'è IL VERDE LA LINEA DEVE ESSERE PIU DRITTA POSSIBILE
-                    current_PEN = self.PEN
-                    self.PEN*=3
-                    esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)
-                    self.PEN = current_PEN
-                else:
-                    esito,centro_linea_x,centro_linea_y =  self.advanced_pid(points,frame,nero_coords)#i motori vengono modificati qui
-               
-               
-                if esito == "DESTRA":
-                    self.motoreDX,self.motoreSX = self.motor_limit,-1*self.motor_limit
-                if esito == "SINISTRA":
-                    self.motoreDX,self.motoreSX = -1*self.motor_limit,self.motor_limit
-                
-                if esito != "NIENTE":
-                    self.AvviaMotori(self.motoreDX,self.motoreSX)
-                
-            else:
-
-                #se uno dei due punti per un qualsiasi motivo non è stato trovato
-                #il centro linea sarà il centro della bounding box
-                centro_linea_x = (x+x+w)//2
-                centro_linea_y = (y_original+y_original+h)//2
-                cv2.circle(frame,(centro_linea_x,centro_linea_y),10,(255,0,0),-1)
-
-                self.deviazione = self.calcola_deviazione(centro_linea_x,h)
-                
-    
-                
-
-            
-            self.motoreDX,self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione=self.deviazione)
-            
-
-        else:
-            pass
-
-        self.AvviaMotori(self.motoreDX,self.motoreSX)
-
-    #^^^^^^^^^LOGICA DEL CODICE DI SEGUILINEA PRINCIPALE^^^^^^^^^^^^^^^^^^^
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    def calcola_deviazione(self, centro_linea_x, altezza_bbox):
-        deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-        multiplicator_h = max(0.01, altezza_bbox / self.cut_y)  # Evita divisione per 0
-        deviazione /= multiplicator_h
-        logging.debug(f"deviazione={deviazione} , moltiplicatore={multiplicator_h}")
-        return deviazione * self.P2
-
-    def gestisci_ostacoli(self, secondi_sleep):
-        # Verifica se il sensore frontale (aggiornato dall'Arduino) rileva un ostacolo (valore valido e inferiore a 15 cm)
-        if (Seguilinea.sensoreFrontale is not None and 
-            0 < Seguilinea.sensoreFrontale < 15):
-            print("Ostacolo rilevato!")
-            
-            # Manda più volte il comando per fermare i motori (eventualmente con una breve pausa)
-            for i in range(2):
-                Seguilinea.messaggio = {"action": "motors", "data": [0, 0]}
-                time.sleep(0.05)  # breve delay per garantire la ricezione
-            
-            # Richiedi i dati dai sensori laterali per aggiornare i valori
-            # Invece di inviare 10 richieste in rapida successione, si potrebbe inviare una richiesta e attendere l'aggiornamento
-            for i in range(3):
-                Seguilinea.messaggio = {"action": "sensors", "data": " "}
-                time.sleep(0.1)  # breve pausa per permettere all'Arduino di rispondere
-            
-            # Se non sono disponibili i dati dei sensori laterali, esce dalla routine
-            if Seguilinea.sensoreDx is None or Seguilinea.sensoreSx is None:
-                print("Sensori laterali non rilevati!")
+            if self.avoiding_obstacle == True:
+                ArduinoManager.pass_obstacle()
+                if w > 50:  #se c'è abbastanza linea 
+                    print("ostacolo schivato!")
+                    self.motor_limit = 40
+                    self.avoiding_obstacle = False
                 return
-            
-            # Sceglie la direzione in base a quale sensore laterale mostra maggiore distanza.
-            # Se il sensore destro ha un valore maggiore, allora c'è più spazio a destra
-            direzione = "destra" if Seguilinea.sensoreDx > Seguilinea.sensoreSx else "sinistra"
+                
 
-            #in caso uno dei due non funzioni,allora si va nella direzione opposta
-            if Seguilinea.sensoreDx < 1:
-                direzione = "sinistra"
-            elif Seguilinea.sensoreSx < 1:
-                direzione = "destra"
+            # Rileva eventuali marker verdi
+            green_positions = self.line_analyzer.detect_green(frame)
+            green_decision = self.line_analyzer.analyze_green_markers(green_positions, self.cam_y, self.cam_x)
+            if green_decision is not None:
+                # Aggiorna l'ultima direzione nota per il verde
+                self.last_green_direction = green_decision
+                if green_decision == "DX":
+                    logging.info("Marker verde: gira a destra")
+                    self.last_green_direction = "DX"
+                    deviation = self.pid_manager.compute_deviation(x + w, h, self.cut_y)
+                    motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                    self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
+                    return
+                elif green_decision == "SX":
+                    logging.info("Marker verde: gira a sinistra")
+                    self.last_green_direction = "SX"
+                    deviation = self.pid_manager.compute_deviation(x, h, self.cut_y)
+                    motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                    self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
+                    return
+                elif green_decision == "DOPPIO":
+                    logging.info("Marker verdi doppi: gestione speciale da implementare")
+                    self.last_green_direction = "DOPPIO"
+                    deviation = self.pid_manager.compute_deviation(0, h, self.cut_y) #girerà su se stesso
+                    motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                    self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
+                    return
+                    # Inserisci qui la logica specifica se necessario.
 
+            # **Nuova logica per le intersezioni**
+            # Se non c'è più il verde, controlla se la linea tocca i bordi (intersezioni)
+            # - Se x == 0 o x+w coincide con la larghezza del frame, oppure se y == 0
+            if (x <= 10) or ((x + w) >= self.cam_x-10): #questo quando c'è un indecisione
+                if self.last_green_direction is not None:
+                    if self.last_green_direction == "DX":
+                        # Se l'ultima direzione verde era a destra, usa il bordo destro della bbox
+                        target_x = x + w
+                        logging.info("Intersezione: seguo il ramo destro")
+                    elif self.last_green_direction == "SX":
+                        # Se era a sinistra, usa il bordo sinistro
+                        target_x = x
+                        logging.info("Intersezione: seguo il ramo sinistro")
+                    else:
+                        target_x = 0 #doppio verde,quindi gira su te stesso ;) 
+               
 
-            print(f"Schivando ostacolo da {direzione}...")
-            
-            # Il comando iniziale di rotazione: gira in base alla direzione scelta.
-            # Qui viene inviato un comando per girare in loco (motori in direzioni opposte)
-            self.AvviaMotori(-self.motor_limit,-self.motor_limit)
-            time.sleep(secondi_sleep) #vai un pò indietro
-            
-            if direzione == "destra":
-                self.AvviaMotori(self.motor_limit, -self.motor_limit)
+                    deviation = self.pid_manager.compute_deviation(target_x, h, self.cut_y)
+                    motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                    self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
+                    return
             else:
-                self.AvviaMotori(-self.motor_limit, self.motor_limit)
-            
-            time.sleep(secondi_sleep)  # Attende per un tempo prestabilito per effettuare la rotazione
-            
-            # Loop di correzione finché non si "ritrova" la linea (verifica in base al riconoscimento della linea)
-            while True:
-                ret, self.frame = self.cam.read()
-                if not ret:
-                    print("Impossibile leggere il frame dalla camera.")
-                    break
-                
-                # Rileva la linea (parte tagliata in basso) per capire se l'ostacolo è stato superato
-                posizione_linea = self.Colors_detector.riconosci_nero_tagliato(
-                    image=self.frame, frame_height=self.cam_y, cut_percentage=self.cut_percentage
-                )
-                if posizione_linea is not None:
-                    x, y, w, h = posizione_linea[0]
-                else:
-                    w = 0  # Se non viene rilevata la linea, consideriamo la larghezza pari a zero
-                
-                # Richiedi aggiornamento dei sensori
-                Seguilinea.messaggio = {"action": "get_sensors", "data": " "}
-                
-                # Correzione PID: usa il sensore laterale del lato verso cui stiamo girando
-                # Correzione: se si gira a destra, si usa il sensore destro; se a sinistra, si usa il sensore sinistro
-                distanza_laterale = Seguilinea.sensoreDx if direzione == "destra" else Seguilinea.sensoreSx
-                
-                deviazione = self.Pid_muro.calcolopid(distanza_laterale)
+                self.last_green_direction = None
 
-                deviazione = np.clip(deviazione,-100,100) #non facciamo girare il robot troppo!
-                
-                # Calcola la potenza motore utilizzando il PID di follow (eventualmente si potrebbe usare una funzione dedicata)
-                self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(deviazione)
-                self.AvviaMotori(self.motoreDX, self.motoreSX)
-                logging.debug(f"deviazione con muro: {deviazione}")
-                
-                # La condizione per uscire dal loop può essere basata sul riconoscimento della linea:
-                # Ad esempio, se la larghezza del bounding box rilevato supera una certa soglia.
-                # Nota: al posto di 'self.cam_x//0.3' si usa il prodotto per una soglia in percentuale.
-                if w > self.cam_x * 0.3:
-                    print("Ostacolo schivato!")
-                    break
-                
-                # Permette di uscire se viene premuto 'q'
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-                
-                try:
-                    cv2.imshow("visuale ostacolo", self.frame)
-                except Exception as e:
-                    logging.debug(f"Impossibile visualizzare il frame: {e}")
-            
-            # Reset delle variabili sensoriali per evitare ulteriori trigger indesiderati
-            Seguilinea.sensoreFrontale = None
-            Seguilinea.sensoreDx = None
-            Seguilinea.sensoreSx = None
-            cv2.destroyAllWindows()
-
-
- 
-        
-    def limit_motor(self,motore):
-        if motore > self.motor_limit:
-            return self.motor_limit
-        if motore < self.motor_limit*-1:
-            return -1*self.motor_limit
-        
-        return motore
-    
-    def advanced_pid(self, points, frame, nero_coords):
-        esito = "NIENTE"
-        """
-        Elabora i punti validi e calcola deviazione, pendenza e altre metriche.
-        """
-        Cinf, Csup = points
-        centro_linea_x = (Cinf[0] + Csup[0]) // 2
-        centro_linea_y = (Cinf[1] + Csup[1]) // 2
-        cv2.circle(frame, (centro_linea_x, centro_linea_y), 5, (255, 0, 0), -1)
-
-        # Calcolo deviazione tramite PID
-        self.deviazione = self.Pid_follow.calcolopid(centro_linea_x)
-
-        try:
-            cv2.circle(frame, Cinf, 5, (0, 255, 0), -1)
-            cv2.circle(frame, Csup, 5, (0, 0, 255), -1)
-        except Exception as e:
-            print("Errore nel disegnare i cerchi:", e)
-
-        # Calcolo pendenza
-        self.pendenza = int(self.calcola_pendenza(A=Cinf, B=Csup, moltiplicator=self.PEN) * self.P)
-
-        # Analisi e priorità tra deviazione e pendenza
-        self.trovata_t(Cinf, Csup, nero_coords)
-
-        if abs(self.deviazione) > abs(self.pendenza):
-            #print(f"Deviazione ha la priorità con: {self.deviazione}")
-            pass
-        else:
-            #print(f"Pendenza ha la priorità con {self.pendenza}")
-            if Cinf[0] < Csup[0]:
-                print("DESTRA!")
-                esito = "DESTRA"
-                
+            # Se non sono presenti intersezioni, prova a ricavare due centri della linea per il PID avanzato
+            points = self.pid_manager.find_line_centers(
+                binary_mask=self.line_analyzer.binary_mask, 
+                cut_y=self.cut_y, 
+                offset=10, 
+                start=0,
+                cam_y=self.cam_y, 
+                cut_percentage=self.cut_percentage
+            )
+            if points is not None and points not in [0, 3]:
+                esito, center_line_x, center_line_y = self.pid_manager.advanced_pid(points, frame, nero_coords)
+                if esito == "DESTRA":
+                    self.arduino_manager.send_motor_commands(self.motor_limit, -self.motor_limit)
+                    return
+                elif esito == "SINISTRA":
+                    self.arduino_manager.send_motor_commands(-self.motor_limit, self.motor_limit)
+                    return
+                # In caso di esito "NIENTE", usa il centro della bbox come fallback
+                center_line_x = (x + x + w) // 2
+                deviation = self.pid_manager.compute_deviation(center_line_x, h, self.cut_y)
             else:
-                print("SINISTRA!")
-                esito = "SINISTRA"
-
-        # Calcolo potenza motori
-        self.motoreDX, self.motoreSX = self.Pid_follow.calcolapotenzamotori(centro_linea_x)
-        return esito,centro_linea_x,centro_linea_y
-
-    def trovata_t(self,Cinf,Csup,posiz_linea):
-            x,y,w,h = posiz_linea
-            #verifichiamo che punto superiore e inferiore siano piu o meno allineati al centro
-            if( (Cinf[0] > self.cam_x//2 - self.cam_x//10 and Cinf[0] < self.cam_x//2 + self.cam_x//10)
-            or(Csup[0] > self.cam_x//2 - self.cam_x//10 and Csup[0] < self.cam_x//2 + self.cam_x//10) ):
-                if(h >= self.cut_y - 3 and( x<3 or x+w>self.cam_x-3)):
-                    pass 
-                    #da completare
-
-    def applica_movimento(self, deviazione):
-        # Funzione per regolare il movimento dei motori in base alla deviazione calcolata
-        potenzaDX, potenzaSX = self.Pid_follow.calcolapotenzamotori(deviazione)
-        # Invia potenza ai motori (implementazione necessaria)
-        print(f"Potenza Motore Destro: {potenzaDX}, Potenza Motore Sinistro: {potenzaSX}")
-        return potenzaDX,potenzaSX
-
-    def calcola_pendenza(self, A, B,moltiplicator):
-        
-        distanza_x = abs(B[0] - A[0] )
-       
-       
-        distanza_modificata = distanza_x  * moltiplicator
-
-        return distanza_modificata
-
-
-    def TrovaCentriLinea(self, offset, start):
-        # Usa la maschera binaria invece di riconoscere di nuovo il nero
-        if self.cut_tresh is None:
-            print("Errore: Maschera binaria non trovata.")
-            return None
-
-        # Ritaglia le parti superiore e inferiore dalla maschera binaria
-        down_part = self.cut_tresh[self.cut_y - offset:self.cut_y, :]
-        up_part = self.cut_tresh[start:start + offset, :] if (start + offset) < self.cut_y else RiconosciColori.thresh[start:self.cut_y, :]
-
-        if down_part.size == 0 or up_part.size == 0:
-            return None
-
-        # Trova i contorni nelle due parti
-        contours_down, _ = cv2.findContours(down_part, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours_up, _ = cv2.findContours(up_part, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Controlla che ci siano contorni validi
-        if contours_down and contours_up:
-            # Trova il bounding box principale in entrambe le parti
-            Bboxes1 = [cv2.boundingRect(c) for c in contours_down if cv2.contourArea(c) > 10]
-            Bboxes2 = [cv2.boundingRect(c) for c in contours_up if cv2.contourArea(c) > 10]
-
-            if Bboxes1 and Bboxes2 and (len(Bboxes1) + len(Bboxes2)) == 2:
-                # Calcola i centri delle bounding box
-                x1, y1, w1, h1 = Bboxes1[0]  # down
-                x2, y2, w2, h2 = Bboxes2[0]  # up
-
-                # Aggiusta la coordinata y per la parte inferiore
-
-                y1+=self.cam_y*self.cut_percentage
-                y2+=self.cam_y*self.cut_percentage
-
-                y1 += self.cut_y - offset
-                y2 += start
-
-
-                # Calcola i centri
-                A = (int((x1 + x1 + w1) / 2), int((y1 + y1 + h1) / 2))
-                B = (int((x2 + x2 + w2) / 2), int((y2 + y2 + h2) / 2))
-
-                return (A, B)  # rispettivamente down e up
-            elif len(Bboxes1) + len(Bboxes2) == 3:
-                return 3
-            else:
-                return 0  # Nessun punto valido trovato
-        else:
-            return None
-    
-    def AvviaMotori(self,DX,SX):
-        DX = self.limit_motor(DX)
-        SX = self.limit_motor(SX)
-        Seguilinea.messaggio = {"action" : "motors","data" : [DX,SX]}
-
-
-        
-
+                # Fallback: usa il centro della bbox
+                center_line_x = (x + x + w) // 2
+                center_line_y = (y_original + y_original + h) // 2
+                cv2.circle(frame, (center_line_x, center_line_y), 10, (255, 0, 0), -1)
+                deviation = self.pid_manager.compute_deviation(center_line_x, h, self.cut_y)
+            
+            motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+            self.arduino_manager.send_motor_commands(motor_dx, motor_sx)

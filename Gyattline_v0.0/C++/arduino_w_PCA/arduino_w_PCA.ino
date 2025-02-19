@@ -197,7 +197,7 @@ void loop() {
   
   // ----- Monitoraggio continuo del sensore frontale -----
   int currentFrontDistance = CheckDistanza(FRONT_TRIG, FRONT_ECHO);
-  if (currentFrontDistance < 20) {
+  if (currentFrontDistance < 15) {
     // Se la distanza è inferiore a 20 cm, avvia (o continua) il timer
     if (frontBelowThresholdStart == 0) {
       frontBelowThresholdStart = millis();

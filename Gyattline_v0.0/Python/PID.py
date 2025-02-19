@@ -24,6 +24,7 @@ class gpPID:
 
     def calcolopid(self, value):
         error = int(self.__setpoint) - int(value)
+        print("error:",self.__setpoint,"-",int(value))
         
         # Accumula l'integrale
         self.__integral += self.__KI * error

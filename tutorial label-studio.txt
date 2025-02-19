@@ -15,6 +15,11 @@ poetry run python label_studio/manage.py collectstatic
 # start the server in development mode at http://localhost:8080
 poetry run python label_studio/manage.py runserver
 
+#CON PIP
+
+pip install label-studio
+label-studio #avvia
+
 una volta fatto il labeling,scarica il dataset e segui il training in questo documento colab
 https://colab.research.google.com/github/EdjeElectronics/Train-and-Deploy-YOLO-Models/blob/main/Train_YOLO_Models.ipynb#scrollTo=4letvP7X12ji
 
