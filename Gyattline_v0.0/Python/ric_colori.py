@@ -84,7 +84,7 @@ class RiconosciColori:
 
         return bounding_boxes if bounding_boxes else None
     
-    def riconosci_verdi(self,image):
+    def riconosci_verdi(self,image,minim):
         #qui ora si lavora con le due mask confrontandole
         #le mask dovrebbero essere entrambi delle stesse dimensioni del frame originale
         mask_verde = self.riconosci_colore_mask(image).copy()
@@ -119,7 +119,7 @@ class RiconosciColori:
             bounding_boxes = [
                 cv2.boundingRect(contour)  
                 for contour in contours #itera in ogni contorno, si trova l'area e vede
-                if cv2.contourArea(contour) > self.min_area  #se l'area è sufficiente, genera la BBox 
+                if cv2.contourArea(contour) > minim  #se l'area è sufficiente, genera la BBox 
             ]
 
             bounding_boxes = sorted(bounding_boxes, key=lambda box: box[2] * box[3], reverse=True)  # prima le BB più grandi

@@ -131,7 +131,7 @@ class Robot:
         Attende che i thread terminino.
         """
         self.serial_thread.join()
-        #self.camera_thread.join()
+        self.camera_thread.join()
 
 
 if __name__ == "__main__":

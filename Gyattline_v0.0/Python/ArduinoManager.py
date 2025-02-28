@@ -40,7 +40,7 @@ class ArduinoManager:
         motor_dx = self.limit_motor(motor_dx)
         motor_sx = self.limit_motor(motor_sx)
         ArduinoManager.message = {"action": "motors", "data": [motor_dx, motor_sx]}
-        logging.debug(f"Invio comandi motori: DX={motor_dx}, SX={motor_sx}")
+        #logging.debug(f"Invio comandi motori: DX={motor_dx}, SX={motor_sx}")
 
     def request_sensor_data(self):
         ArduinoManager.message = {"action": "get_sensors", "data": " "}

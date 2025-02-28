@@ -19,6 +19,8 @@ class LineGreenAnalyzer:
         self.min_area = min_area
         self.color_detector = RiconosciColori(self.GREEN[0], self.GREEN[1], self.min_area)
         self.binary_mask = None
+        self.timer_doppio = time.time()
+        self.last_verde = None
 
     def detect_line(self, image, frame_height, cut_percentage):
         """
@@ -32,11 +34,11 @@ class LineGreenAnalyzer:
         self.binary_mask = RiconosciColori.thresh[int(frame_height * cut_percentage):frame_height, :].copy()
         return bboxes
 
-    def detect_green(self, image):
+    def detect_green(self, image,minim = 200):
         """
         Rileva i marker verdi nell'immagine.
         """
-        green_positions = self.color_detector.riconosci_verdi(image=image)
+        green_positions = self.color_detector.riconosci_verdi(image=image,minim=minim)
         return green_positions
 
     def analyze_green_markers(self, green_positions, cam_y, cam_x):
@@ -44,17 +46,29 @@ class LineGreenAnalyzer:
         Analizza i marker verdi rilevati e, se presenti nell'area bassa, restituisce
         un'indicazione (ad esempio "DX", "SX" o "DOPPIO") per indicare una svolta.
         """
+
+
         if green_positions is None:
+            self.timer_verdi = time.time()
             return None
+
+        if len(green_positions) != 2: 
+            self.timer_verdi = time.time()
+
         valid_greens = []
         for green in green_positions:
             x, y, w, h = green["coords"]
-            if (y + h) > cam_y * 0.7:  # Considera solo quelli nella parte inferiore
+            if (y + h) > cam_y * 0.5:  # Considera solo quelli nella parte inferiore
                 valid_greens.append(green)
         if len(valid_greens) == 1:
+            self.last_verde = valid_greens[0]["position"]
             return valid_greens[0]["position"]
         elif len(valid_greens) == 2:
-            logging.info("Rilevati due marker verdi (DOPPIO)")
-            return "DOPPIO"
+            if time.time()-self.timer_verdi > 1:
+                return "DOPPIO!"
+            else:
+                return self.last_verde
+
+
         else:
             return None

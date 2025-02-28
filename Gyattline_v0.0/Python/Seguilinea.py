@@ -65,7 +65,7 @@ class Seguilinea:
                 
 
             # Rileva eventuali marker verdi
-            green_positions = self.line_analyzer.detect_green(frame)
+            green_positions = self.line_analyzer.detect_green(frame,200)
             green_decision = self.line_analyzer.analyze_green_markers(green_positions, self.cam_y, self.cam_x)
             if green_decision is not None:
                 # Aggiorna l'ultima direzione nota per il verde

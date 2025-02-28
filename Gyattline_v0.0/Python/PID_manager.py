@@ -23,7 +23,6 @@ class PIDManager:
         deviation = self.pid_follow.calcolopid(center_line_x)
         multiplicator_h = max(0.01, bbox_height / total_height)
         deviation /= multiplicator_h
-        logging.debug(f"Deviazione calcolata: {deviation} (moltiplicatore: {multiplicator_h})")
         return deviation * self.P2
 
     def compute_motor_commands(self, deviation):
@@ -39,7 +38,7 @@ class PIDManager:
         Restituisce una tupla (A, B) oppure 0/3 in caso di rilevamenti particolari.
         """
         if binary_mask is None:
-            logging.error("Maschera binaria assente in find_line_centers")
+            
             return None
 
         # Ritaglia le parti inferiore e superiore della maschera
@@ -106,7 +105,7 @@ class PIDManager:
         
         # Calcola la “pendenza” come differenza in x moltiplicata per il fattore
         slope = abs(Csup[0] - Cinf[0]) * self.pen_multiplier
-        logging.debug(f"Pendenza calcolata: {slope}")
+        
         
         if abs(deviation) > slope:
             # La deviazione ha la precedenza
