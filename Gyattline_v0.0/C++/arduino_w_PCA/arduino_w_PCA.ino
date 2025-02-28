@@ -57,8 +57,8 @@ void AvviaMotori(int DX, int SX, int lim = 100) {
   AvviaServoAvanti(potenzaDX + 10, -potenzaSX + 10);
 
   // Avvia i motori posteriori: qui si impone che la velocità sia non negativa
-  potenzaDX = constrain(potenzaDX, -lim, 0);
-  potenzaSX = constrain(potenzaSX, -lim, 0);
+  potenzaDX = constrain(potenzaDX, -lim, lim);
+  potenzaSX = constrain(potenzaSX, -lim, lim);
   AvviaServoIndietro(potenzaDX + 10, -potenzaSX + 10);
 }
 
@@ -148,7 +148,7 @@ void setup() {
  
   gestiscibraccio(200); // Posiziona il braccio in alto
   apribracci();        // Apre i bracci
-  AvviaMotori(50, 50);
+  
 }
 
 // --------------------------
@@ -195,33 +195,5 @@ void loop() {
       Serial.println();
     }
   }
-  
-  // ----- Monitoraggio continuo del sensore frontale -----
-  int currentFrontDistance = CheckDistanza(FRONT_TRIG, FRONT_ECHO);
-  if (currentFrontDistance < 15) {
-    // Se la distanza è inferiore a 20 cm, avvia (o continua) il timer
-    if (frontBelowThresholdStart == 0) {
-      frontBelowThresholdStart = millis();
-    }
-    else if (millis() - frontBelowThresholdStart >= 500 && !frontBelowThresholdNotified) {
-      // Se la condizione persiste per 2 secondi, invia automaticamente i dati dei sensori
-      int rightDistance = CheckDistanza(RIGHT_TRIG, RIGHT_ECHO);
-      int leftDistance  = CheckDistanza(LEFT_TRIG, LEFT_ECHO);
-      
-      StaticJsonDocument<200> alertDoc;
-      alertDoc["front"] = currentFrontDistance;
-      alertDoc["right"] = rightDistance;
-      alertDoc["left"]  = leftDistance;
-      
-      serializeJson(alertDoc, Serial);
-      Serial.println();
-      
-      frontBelowThresholdNotified = true;  // Impedisce invii ripetuti continui
-    }
-  } 
-  else {
-    // Se la distanza torna sopra 20 cm, resetta il timer e il flag
-    frontBelowThresholdStart = 0;
-    frontBelowThresholdNotified = false;
-  }
+
 }
