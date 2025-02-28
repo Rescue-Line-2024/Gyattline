@@ -21,12 +21,15 @@ class Robot:
         self.camera_thread.start()
 
     def serial_communication(self):
+        
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
         try:
             conn.open_connection()
             
             while not self.stop_signal:
                 # Lettura di eventuali messaggi in arrivo dall'Arduino
+                #ArduinoManager.message = {"action": "motors", "data": [i, -i]}
+                
                 response = conn.read_message()
                 if response:
                     try:
@@ -83,11 +86,11 @@ class Robot:
             cam=cam,
             pid_params=pid_params,
             P2=1,
-            pen_multiplier=0.5,
+            pen_multiplier=0.1,
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
-            motor_limit=40
+            motor_limit=30
         )
         
         
@@ -128,7 +131,7 @@ class Robot:
         Attende che i thread terminino.
         """
         self.serial_thread.join()
-        self.camera_thread.join()
+        #self.camera_thread.join()
 
 
 if __name__ == "__main__":

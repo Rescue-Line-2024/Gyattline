@@ -73,7 +73,7 @@ class Seguilinea:
                 if green_decision == "DX":
                     logging.info("Marker verde: gira a destra")
                     self.last_green_direction = "DX"
-                    deviation = self.pid_manager.compute_deviation(x + w, h, self.cut_y)
+                    deviation = self.pid_manager.compute_deviation(x+w, h, self.cut_y)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
                     return

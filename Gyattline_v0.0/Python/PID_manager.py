@@ -14,7 +14,7 @@ class PIDManager:
     Si occupa anche di ricavare i centri della linea (da una maschera binaria) e di calcolare la deviazione.
     """
     def __init__(self, P, I, D, setpoint=0, P2=1.0, pen_multiplier=1.0):
-        self.pid_follow = gpPID(P, I, D, -1, setpoint)  # Il setpoint (centro) verrà aggiornato
+        self.pid_follow = gpPID(P, I, D, 1, setpoint)  # Il setpoint (centro) verrà aggiornato
         self.pid_wall = gpPID(20, 0, 0, -1, 12)
         self.P2 = P2           # Fattore di moltiplicazione per la deviazione
         self.pen_multiplier = pen_multiplier  # Fattore per la “pendenza”
