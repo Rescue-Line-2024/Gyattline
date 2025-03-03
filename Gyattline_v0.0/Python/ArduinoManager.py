@@ -44,7 +44,7 @@ class ArduinoManager:
 
     def request_sensor_data(self):
         ArduinoManager.message = {"action": "get_sensors", "data": " "}
-        time.sleep(0.1)
+        
         
     def handle_obstacle(self, obstacle_sleep=1):
         """

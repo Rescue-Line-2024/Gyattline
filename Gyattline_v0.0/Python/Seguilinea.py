@@ -34,10 +34,16 @@ class Seguilinea:
         self.last_green_direction = None
         self.avoiding_obstacle = False
 
+        self.sensor_timer = time.time()
+
     def follow_line(self, frame):
         frame_height, frame_width = frame.shape[:2]
         # Rileva la linea nell'immagine completa (o in quella tagliata)
         line_bboxes = self.line_analyzer.detect_line(frame, frame_height, self.cut_percentage)
+        
+        if time.time() - self.sensor_timer > 0.3:
+            self.arduino_manager.request_sensor_data()
+            print(f"DX{ArduinoManager.right_sensor},SX{ArduinoManager.left_sensor},FRONT{ArduinoManager.front_sensor}")
 
         if line_bboxes is not None:
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
@@ -57,9 +63,9 @@ class Seguilinea:
 
             if self.avoiding_obstacle == True:
                 ArduinoManager.pass_obstacle()
-                if w > 50:  #se c'è abbastanza linea 
+                if w > 50 or cv2.waitKey(1) & 0xFF == ord('q'):
                     print("ostacolo schivato!")
-                    self.motor_limit = 40
+                    self.motor_limit = 35
                     self.avoiding_obstacle = False
                 return
                 

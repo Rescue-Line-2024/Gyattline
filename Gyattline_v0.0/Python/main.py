@@ -26,7 +26,7 @@ class Robot:
         try:
             conn.open_connection()
             
-            while not self.stop_signal:
+                    
                 # Lettura di eventuali messaggi in arrivo dall'Arduino
                 #ArduinoManager.message = {"action": "motors", "data": [i, -i]}
                 
