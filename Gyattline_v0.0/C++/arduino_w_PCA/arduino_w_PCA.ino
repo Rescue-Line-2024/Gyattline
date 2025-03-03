@@ -27,7 +27,7 @@ Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);
 #define LEFT_TRIG 5
 #define LEFT_ECHO 6
 
-#define Infrared  A1  // (Non modificato; verificare se è effettivamente usato)
+#define IN_A0  A0  // (Non modificato; verificare se è effettivamente usato)
 
 // --------------------------
 // VARIABILI PER IL MONITORAGGIO DEL SENSORE FRONTANALE
@@ -156,6 +156,7 @@ void setup() {
 // --------------------------
 void loop() {
   // ----- Gestione dei comandi in arrivo via Serial -----
+
   if (Serial.available() > 0) {
     Message = Serial.readStringUntil('\n');
 
