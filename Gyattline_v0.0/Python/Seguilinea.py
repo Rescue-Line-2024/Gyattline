@@ -135,10 +135,10 @@ class Seguilinea:
             if points is not None and points not in [0, 3]:
                 esito, center_line_x, center_line_y = self.pid_manager.advanced_pid(points, frame, nero_coords)
                 if esito == "DESTRA":
-                    self.arduino_manager.send_motor_commands(self.motor_limit, -self.motor_limit)
+                    self.arduino_manager.send_motor_commands(-self.motor_limit, self.motor_limit)
                     return
                 elif esito == "SINISTRA":
-                    self.arduino_manager.send_motor_commands(-self.motor_limit, self.motor_limit)
+                    self.arduino_manager.send_motor_commands(self.motor_limit, -self.motor_limit)
                     return
                 # In caso di esito "NIENTE", usa il centro della bbox come fallback
                 center_line_x = (x + x + w) // 2

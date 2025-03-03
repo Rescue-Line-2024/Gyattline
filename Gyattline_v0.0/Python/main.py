@@ -2,6 +2,7 @@ from threading import Thread, Lock
 from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
 from ric_colori import RiconosciColori
 from Seguilinea import Seguilinea
+from ArduinoManager import ArduinoManager
 import cv2
 import time
 
@@ -51,7 +52,7 @@ class Robot:
                     conn.send_message(ArduinoManager.message)
                     ArduinoManager.message = None
 
-                time.sleep(0.1)  # Piccola pausa per evitare di sovraccaricare la CPU
+                time.sleep(0.05)  # Piccola pausa per evitare di sovraccaricare la CPU
 
         except Exception as e:
             print("Errore nella comunicazione seriale:", e)
@@ -77,7 +78,18 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        Line_follower = Seguilinea(cam=cam,P=3, I=0, D=0, P2=1.5,PEN=0.5, min_area=50, cam_resolution=(width, height),motor_limit = 40)
+        pid_params = (1, 0, 0)
+        # Crea l'istanza del SeguiLinea
+        Line_follower = Seguilinea(
+            cam=cam,
+            pid_params=pid_params,
+            P2=1,
+            pen_multiplier=2,
+            cam_resolution=(width, height),
+            min_area=50,
+            cut_percentage=0.6,
+            motor_limit=25
+        )
         
         
         
@@ -92,7 +104,7 @@ class Robot:
 
                 #IL seguilinea tornerà un json con l'azione e il dato
                 
-                Line_follower.segui_linea(frame)
+                Line_follower.follow_line(frame)
 
                 # Mostra i frame
                 try:

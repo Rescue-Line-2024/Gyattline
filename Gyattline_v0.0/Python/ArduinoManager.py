@@ -101,10 +101,10 @@ class ArduinoManager:
 
 
     def pass_obstacle(self):
-        self.motor_limit = 25
-        self.request_sensor_data() #il risultato verrà salvato nelle variabili di classe
-        sensor = ArduinoManager.right_sensor if self.last_obstacle_position == "right" else ArduinoManager.left_sensor
-        deviation = self.pid_wall.calcolopid(sensor)
-        return deviation
+            self.motor_limit = 25
+            self.request_sensor_data() #il risultato verrà salvato nelle variabili di classe
+            sensor = ArduinoManager.right_sensor if self.last_obstacle_position == "right" else ArduinoManager.left_sensor
+            deviation = self.pid_wall.calcolopid(sensor)
+            return deviation
         
 
