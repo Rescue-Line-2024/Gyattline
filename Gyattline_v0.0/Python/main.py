@@ -1,3 +1,5 @@
+
+
 from threading import Thread, Lock
 from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
 from ric_colori import RiconosciColori
@@ -34,7 +36,7 @@ class Robot:
                             ArduinoManager.front_sensor = response["front"]
                             ArduinoManager.left_sensor = response["left"]
                             ArduinoManager.right_sensor = response["right"]
-                            print(f"Sensori: Front={response['front']}, Left={response['left']}, Right={response['right']}")
+                            #print(f"Sensori: Front={response['front']}, Left={response['left']}, Right={response['right']}")
                         
                         # Gestione di altri tipi di messaggi
                         elif "action" in response:
@@ -108,8 +110,9 @@ class Robot:
 
                 # Mostra i frame
                 try:
-                    cv2.imshow("Camera principale", frame)
-                    cv2.imshow("Rilevamento colori", frame_colori)
+                    pass
+                    #cv2.imshow("Camera principale", frame)
+                    #cv2.imshow("Rilevamento colori", frame_colori)
                 except:
                     pass
 

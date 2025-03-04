@@ -43,7 +43,7 @@ class Seguilinea:
         
         if time.time() - self.sensor_timer > 0.5: #ogni tanto richiedi i sensori
             self.arduino_manager.request_sensor_data()
-            #print(f"DX{ArduinoManager.right_sensor},SX{ArduinoManager.left_sensor},FRONT{ArduinoManager.front_sensor}")
+            
 
         if line_bboxes is not None:
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
@@ -57,16 +57,17 @@ class Seguilinea:
             nero_coords = (x, y, w, h)  # coordinate relative per ulteriori elaborazioni
 
             # Gestione ostacoli (se i sensori li segnalano)
-            if(self.arduino_manager.handle_obstacle(1) == True):
+            if(self.arduino_manager.handle_obstacle(2) == True):
                 #incomincia schivata ostacolo
                 self.avoiding_obstacle = True
 
             if self.avoiding_obstacle == True:
-                dev = ArduinoManager.pass_obstacle()
-                print("deviazione ostacolo:",dev)
-                motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                dev = self.arduino_manager.pass_obstacle()
+                dev = np.clip(dev,-100,100)
+                motor_dx, motor_sx = self.pid_manager.compute_motor_commands(dev)
+                print("motori:",motor_dx,motor_sx)
                 self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
-
+                time.sleep(0.1)
                 if w > 400:
                     print("ostacolo schivato!")
                     ArduinoManager.motor_limit = 35

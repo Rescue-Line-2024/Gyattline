@@ -81,15 +81,15 @@ class ArduinoManager:
             time.sleep(obstacle_sleep)
             # Ruota in base alla direzione scelta
             if direction == "right":
-                self.send_motor_commands(self.motor_limit, -self.motor_limit)
+                self.send_motor_commands(-self.motor_limit, self.motor_limit)
                 print("DESTRA!!")
             else:
-                self.send_motor_commands(-self.motor_limit, self.motor_limit)
+                self.send_motor_commands(self.motor_limit, -self.motor_limit)
                 print("SINISTRA!!!")
-            time.sleep(obstacle_sleep/2)
+            time.sleep(obstacle_sleep*1.5)
 
             self.send_motor_commands(self.motor_limit, self.motor_limit)
-            time.sleep(obstacle_sleep)
+            time.sleep(obstacle_sleep/2)
              #in seguilinea procedi a fare il pid con il muro ed esci quando vedi il nero dal cilo
             
             # In un ciclo di correzione potremmo verificare il ripristino della linea
@@ -105,7 +105,8 @@ class ArduinoManager:
 
     def pass_obstacle(self):
             self.motor_limit = 25
-            self.request_sensor_data() #il risultato verrà salvato nelle variabili di classe
+            self.request_sensor_data()
+            time.sleep(0.1) #il risultato verrà salvato nelle variabili di classe
             sensor = ArduinoManager.right_sensor if self.last_obstacle_position == "right" else ArduinoManager.left_sensor
             print("sensore usato:",sensor)
             deviation = self.pid_wall.calcolopid(sensor)
