@@ -41,9 +41,9 @@ class Seguilinea:
         # Rileva la linea nell'immagine completa (o in quella tagliata)
         line_bboxes = self.line_analyzer.detect_line(frame, frame_height, self.cut_percentage)
         
-        if time.time() - self.sensor_timer > 0.3:
+        if time.time() - self.sensor_timer > 0.5: #ogni tanto richiedi i sensori
             self.arduino_manager.request_sensor_data()
-            print(f"DX{ArduinoManager.right_sensor},SX{ArduinoManager.left_sensor},FRONT{ArduinoManager.front_sensor}")
+            #print(f"DX{ArduinoManager.right_sensor},SX{ArduinoManager.left_sensor},FRONT{ArduinoManager.front_sensor}")
 
         if line_bboxes is not None:
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
@@ -62,12 +62,17 @@ class Seguilinea:
                 self.avoiding_obstacle = True
 
             if self.avoiding_obstacle == True:
-                ArduinoManager.pass_obstacle()
-                if w > 50 or cv2.waitKey(1) & 0xFF == ord('q'):
+                dev = ArduinoManager.pass_obstacle()
+                print("deviazione ostacolo:",dev)
+                motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+                self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
+
+                if w > 400:
                     print("ostacolo schivato!")
-                    self.motor_limit = 35
+                    ArduinoManager.motor_limit = 35
                     self.avoiding_obstacle = False
-                return
+                else:
+                    return
                 
 
             # Rileva eventuali marker verdi
