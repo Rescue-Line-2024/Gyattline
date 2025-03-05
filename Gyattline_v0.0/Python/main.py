@@ -11,6 +11,7 @@ import time
 
 class Robot:
     def __init__(self):
+        
         self.stop_signal = False  # Segnale per terminare i thread
         self.lock = Lock()  # Lock per sincronizzare l'accesso ai dati condivisi
 
@@ -32,14 +33,16 @@ class Robot:
                 if response:
                     try:
                         # Se il messaggio contiene i dati dei sensori
-                        if "front" in response and "left" in response and "right" in response:
+                        if "front" in response:
                             ArduinoManager.front_sensor = response["front"]
+                        if "left" in response:
                             ArduinoManager.left_sensor = response["left"]
+                        if "right" in response:
                             ArduinoManager.right_sensor = response["right"]
-                            #print(f"Sensori: Front={response['front']}, Left={response['left']}, Right={response['right']}")
+                        
                         
                         # Gestione di altri tipi di messaggi
-                        elif "action" in response:
+                        if "action" in response:
                             if response["action"] == "stop":
                                 print("Ricevuto comando di stop dall'Arduino")
                                 self.stop_signal = True
@@ -52,9 +55,10 @@ class Robot:
                 # Invio di comandi all'Arduino se presenti
                 if ArduinoManager.message is not None:
                     conn.send_message(ArduinoManager.message)
+                    time.sleep(0.1)  # Piccola pausa per evitare di sovraccaricare la CPU
                     ArduinoManager.message = None
 
-                time.sleep(0.05)  # Piccola pausa per evitare di sovraccaricare la CPU
+                
 
         except Exception as e:
             print("Errore nella comunicazione seriale:", e)
@@ -80,13 +84,13 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        pid_params = (1, 0, 0)
+        pid_params = (2, 0, 0)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
             pid_params=pid_params,
-            P2=1,
-            pen_multiplier=2,
+            P2=1.5,
+            pen_multiplier=0.1,
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
@@ -123,6 +127,11 @@ class Robot:
                     Seguilinea.messaggio = {"action" : "stop"}
                     self.stop_signal = True
                     break
+
+        except KeyboardInterrupt:
+            print("keyboard interrupt rilevato")
+            cam.release()
+            cv2.destroyAllWindows()
         finally:
             cam.release()
             cv2.destroyAllWindows()
@@ -137,4 +146,4 @@ class Robot:
 
 if __name__ == "__main__":
     robot = Robot()
-    robot.join_threads()
+    #robot.join_threads()

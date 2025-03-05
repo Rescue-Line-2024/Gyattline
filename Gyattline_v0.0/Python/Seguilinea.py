@@ -35,16 +35,41 @@ class Seguilinea:
         self.avoiding_obstacle = False
 
         self.sensor_timer = time.time()
-
+        self.sensor_request_interval = 0.5
+        self.w = 0
     def follow_line(self, frame):
         frame_height, frame_width = frame.shape[:2]
         # Rileva la linea nell'immagine completa (o in quella tagliata)
         line_bboxes = self.line_analyzer.detect_line(frame, frame_height, self.cut_percentage)
+        if line_bboxes is not None:
+            x, y, self.w, h = line_bboxes[0]
+
+
         
-        if time.time() - self.sensor_timer > 0.5: #ogni tanto richiedi i sensori
+        if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
             self.arduino_manager.request_sensor_data()
+            #print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
+            self.sensor_timer = time.time()
+            return
+        
+        if(self.arduino_manager.handle_obstacle(1.3) == True) and self.avoiding_obstacle == False:
+                #incomincia schivata ostacolo
+                self.avoiding_obstacle = True
+
+        if self.avoiding_obstacle == True:
+            self.sensor_request_interval = 0.1
+            self.arduino_manager.pass_obstacle()
+
+            if self.w > 400:
+                print("ostacolo schivato!")
+                ArduinoManager.motor_limit = 35
+                self.sensor_request_interval = 0.5
+                self.avoiding_obstacle = False
+            else:
+                return
             
 
+            
         if line_bboxes is not None:
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
             self.cut_y = self.line_analyzer.binary_mask.shape[0]
@@ -57,24 +82,9 @@ class Seguilinea:
             nero_coords = (x, y, w, h)  # coordinate relative per ulteriori elaborazioni
 
             # Gestione ostacoli (se i sensori li segnalano)
-            if(self.arduino_manager.handle_obstacle(2) == True):
-                #incomincia schivata ostacolo
-                self.avoiding_obstacle = True
+            
+            
 
-            if self.avoiding_obstacle == True:
-                dev = self.arduino_manager.pass_obstacle()
-                dev = np.clip(dev,-100,100)
-                motor_dx, motor_sx = self.pid_manager.compute_motor_commands(dev)
-                print("motori:",motor_dx,motor_sx)
-                self.arduino_manager.send_motor_commands(motor_dx, motor_sx)
-                time.sleep(0.1)
-                if w > 400:
-                    print("ostacolo schivato!")
-                    ArduinoManager.motor_limit = 35
-                    self.avoiding_obstacle = False
-                else:
-                    return
-                
 
             # Rileva eventuali marker verdi
             green_positions = self.line_analyzer.detect_green(frame,200)

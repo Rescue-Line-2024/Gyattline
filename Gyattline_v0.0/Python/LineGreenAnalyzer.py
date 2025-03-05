@@ -59,7 +59,7 @@ class LineGreenAnalyzer:
         valid_greens = []
         for green in green_positions:
             x, y, w, h = green["coords"]
-            if (y + h) > cam_y * 0.3:  # Considera solo quelli nella parte inferiore
+            if (y + h) > cam_y * 0.7:  # Considera solo quelli nella parte inferiore
                 valid_greens.append(green)
         if len(valid_greens) == 1:
             self.last_verde = valid_greens[0]["position"]

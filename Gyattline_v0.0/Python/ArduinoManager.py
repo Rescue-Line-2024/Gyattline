@@ -27,7 +27,7 @@ class ArduinoManager:
         ArduinoManager.message = None
         # Valori aggiornati dal thread seriale
         self.last_obstacle_position = None
-        self.pid_wall = gpPID(20, 0, 0, -1, 12)
+        self.pid_wall = gpPID(10, 0, 0, -1, 7)
 
     def limit_motor(self, motor):
         if motor > self.motor_limit:
@@ -83,10 +83,13 @@ class ArduinoManager:
             if direction == "right":
                 self.send_motor_commands(-self.motor_limit, self.motor_limit)
                 print("DESTRA!!")
+                self.pid_wall.inverted = -1
             else:
                 self.send_motor_commands(self.motor_limit, -self.motor_limit)
                 print("SINISTRA!!!")
-            time.sleep(obstacle_sleep*1.5)
+                self.pid_wall.inverted = 1
+
+            time.sleep(obstacle_sleep*2)
 
             self.send_motor_commands(self.motor_limit, self.motor_limit)
             time.sleep(obstacle_sleep/2)
@@ -94,9 +97,9 @@ class ArduinoManager:
             
             # In un ciclo di correzione potremmo verificare il ripristino della linea
             # (qui semplificato: si esce subito)
-            self.front_sensor = None
-            self.left_sensor = None
-            self.right_sensor = None
+            ArduinoManager.front_sensor = None
+            ArduinoManager.left_sensor = None
+            ArduinoManager.right_sensor = None
 
             #IMPLEMENTARE PID CON MURO ALTEOVE!!!!
             self.last_obstacle_position = direction
@@ -104,12 +107,18 @@ class ArduinoManager:
 
 
     def pass_obstacle(self):
-            self.motor_limit = 25
-            self.request_sensor_data()
-            time.sleep(0.1) #il risultato verrà salvato nelle variabili di classe
-            sensor = ArduinoManager.right_sensor if self.last_obstacle_position == "right" else ArduinoManager.left_sensor
-            print("sensore usato:",sensor)
-            deviation = self.pid_wall.calcolopid(sensor)
-            return deviation
+            if ArduinoManager.right_sensor is not None or ArduinoManager.left_sensor is not None:
+                self.motor_limit = 25
+                sensor = ArduinoManager.right_sensor if self.last_obstacle_position == "left" else ArduinoManager.left_sensor
+                print("sensore usato:",sensor)
+                dev = self.pid_wall.calcolopid(sensor)
+                dev = np.clip(dev,-100,100)
+                motor_dx, motor_sx = self.pid_wall.calcolapotenzamotori(dev)
+                print("motori:",motor_dx,motor_sx)
+                self.send_motor_commands(motor_dx, motor_sx)
+                
+
+            
+            
         
 
