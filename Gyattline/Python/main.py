@@ -46,6 +46,9 @@ class Robot:
                             if response["action"] == "stop":
                                 print("Ricevuto comando di stop dall'Arduino")
                                 self.stop_signal = True
+                            elif response["action"] == "ARGENTO":
+                                print("ARGENTOOOO!!!")
+                                time.sleep(1)
                             else:
                                 print(f"Messaggio ricevuto: {response}")
                     

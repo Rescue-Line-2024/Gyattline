@@ -129,7 +129,7 @@ void setup() {
   AvviaServoIndietro(10, 10);
  
   // Configurazione del pin analogico (se necessario)
-  pinMode(IN_A0, INPUT);
+  pinMode(12,INPUT);
 
   // Configura i pin dei sensori ad ultrasuoni
   // Sensore frontale
@@ -142,12 +142,7 @@ void setup() {
   pinMode(LEFT_TRIG, OUTPUT);
   pinMode(LEFT_ECHO, INPUT);
 
-  // Inizializzazione di alcuni servomotori (es. TILT e braccio)
-  impostaservo(145, 4); // Esempio: 145 gradi per il TILT (altri valori possibili in base all'applicazione)
-  impostaservo(95, 15);
  
-  gestiscibraccio(200); // Posiziona il braccio in alto
-  apribracci();        // Apre i bracci
   
 }
 
@@ -195,6 +190,14 @@ void loop() {
       serializeJson(response, Serial);
       Serial.println();
     }
+
+    if(digitalRead(12)){
+    StaticJsonDocument<200> response;
+    response["action"] = "ARGENTO";
+    serializeJson(response,Serial);
+    Serial.println();
+    }
+
   }
 
 }
