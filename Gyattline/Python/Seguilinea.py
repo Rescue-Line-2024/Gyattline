@@ -74,9 +74,12 @@ class Seguilinea:
         if line_bboxes is not None:
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
             self.cut_y = self.line_analyzer.binary_mask.shape[0]
+
             
             # Prendi la prima bounding box rilevata
             x, y, w, h = line_bboxes[0]
+
+            is_line_centered = x > 30 and x+w < self.cam_x-30 #per vedere se la linea si trova più o meno al centro
             # Ripristino la coordinata y nel sistema completo
             y_original = y + int(self.cam_y * self.cut_percentage)
             adjusted_bbox = (x, y_original, w, h)
@@ -96,27 +99,27 @@ class Seguilinea:
                 if green_decision == "DX":
                     logging.info("Marker verde: gira a destra")
                     self.last_green_direction = "DX"
-                    deviation = self.pid_manager.compute_deviation(x+w, h, self.cut_y)
+                    deviation = self.pid_manager.compute_deviation_h(x+w, h, self.cut_y,is_line_centered)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
                 elif green_decision == "SX":
                     logging.info("Marker verde: gira a sinistra")
                     self.last_green_direction = "SX"
-                    deviation = self.pid_manager.compute_deviation(x, h, self.cut_y)
+                    deviation = self.pid_manager.compute_deviation_h(x, h, self.cut_y,is_line_centered)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
                 elif green_decision == "DOPPIO!":
                     logging.info("Marker verdi doppi: gestione speciale da implementare")
                     self.last_green_direction = "DOPPIO"
-                    deviation = self.pid_manager.compute_deviation(0, h, self.cut_y) #girerà su se stesso
+                    deviation = self.pid_manager.compute_deviation_h(0, h, self.cut_y,is_line_centered) #girerà su se stesso
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
                     # Inserisci qui la logica specifica se necessario.
 
-            # **Nuova logica per le intersezioni**
+            #**Nuova logica per le intersezioni**
             # Se non c'è più il verde, controlla se la linea tocca i bordi (intersezioni)
             # - Se x == 0 o x+w coincide con la larghezza del frame, oppure se y == 0
             if (x <= 10) or ((x + w) >= self.cam_x-10): #questo quando c'è un indecisione
@@ -133,7 +136,7 @@ class Seguilinea:
                         target_x = 0 #doppio verde,quindi gira su te stesso ;) 
                
 
-                    deviation = self.pid_manager.compute_deviation(target_x, h, self.cut_y)
+                    deviation = self.pid_manager.compute_deviation_h(target_x, h, self.cut_y,is_line_centered)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
@@ -159,13 +162,15 @@ class Seguilinea:
                     return
                 # In caso di esito "NIENTE", usa il centro della bbox come fallback
                 center_line_x = (x + x + w) // 2
-                deviation = self.pid_manager.compute_deviation(center_line_x, h, self.cut_y)
+                center_line_y = (y_original + y_original + h) // 2
+                cv2.circle(frame, (center_line_x, center_line_y), 5, (255, 0, 0), -1)
+                deviation = self.pid_manager.compute_deviation_h(center_line_x, h, self.cut_y,is_line_centered)
             else:
                 # Fallback: usa il centro della bbox
                 center_line_x = (x + x + w) // 2
                 center_line_y = (y_original + y_original + h) // 2
-                cv2.circle(frame, (center_line_x, center_line_y), 10, (255, 0, 0), -1)
-                deviation = self.pid_manager.compute_deviation(center_line_x, h, self.cut_y)
+                cv2.circle(frame, (center_line_x, center_line_y), 5, (255, 0, 0), -1)
+                deviation = self.pid_manager.compute_deviation_h(center_line_x, h, self.cut_y,is_line_centered)
             
             motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
             ArduinoManager.send_motor_commands(motor_dx, motor_sx)

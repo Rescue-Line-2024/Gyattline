@@ -19,11 +19,16 @@ class PIDManager:
         self.P2 = P2           # Fattore di moltiplicazione per la deviazione
         self.pen_multiplier = pen_multiplier  # Fattore per la “pendenza”
 
-    def compute_deviation(self, center_line_x, bbox_height, total_height):
+    def compute_deviation_h(self, center_line_x, bbox_height, total_height,is_line_centered):
         deviation = self.pid_follow.calcolopid(center_line_x)
-        multiplicator_h = max(0.01, bbox_height / total_height)
+        multiplicator_h = max(0.1, bbox_height / total_height)
         deviation /= multiplicator_h
-        return deviation * self.P2
+
+        if is_line_centered:
+            return deviation
+        else:
+            print("Mul:",multiplicator_h)
+            return deviation * self.P2
 
     def compute_motor_commands(self, deviation):
         motor_dx, motor_sx = self.pid_follow.calcolapotenzamotori(deviation)
@@ -62,11 +67,11 @@ class PIDManager:
                 x2, y2, w2, h2 = bboxes_up[0]
 
                 # Aggiusta la coordinata y per tenere conto della parte tagliata
-                y1 += int(cam_y * (1-cut_percentage))
-                y2 += int(cam_y * (1-cut_percentage))
+                y1 += int(cam_y * cut_percentage)
+                y2 += int(cam_y * cut_percentage)
 
-                y1 += cut_y+offset
-                y2 += offset
+                y1 += cut_y-offset
+                y2 -= offset
                 
 
                 # Calcola i centri delle bounding box
@@ -94,12 +99,12 @@ class PIDManager:
         
         center_line_x = (Cinf[0] + Csup[0]) // 2
         center_line_y = (Cinf[1] + Csup[1]) // 2
-        cv2.circle(frame, (center_line_x, center_line_y), 5, (255, 0, 0), -1)
+        cv2.circle(frame, (center_line_x, center_line_y), 2, (255, 0, 0), -1)
         
         deviation = self.pid_follow.calcolopid(center_line_x)
         try:
-            cv2.circle(frame, Cinf, 5, (0, 255, 0), -1)
-            cv2.circle(frame, Csup, 5, (0, 0, 255), -1)
+            cv2.circle(frame, Cinf, 2, (0, 255, 0), -1)
+            cv2.circle(frame, Csup, 2, (0, 0, 255), -1)
         except Exception as e:
             logging.error(f"Errore nel disegnare i cerchi: {e}")
         

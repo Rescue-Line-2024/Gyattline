@@ -19,23 +19,20 @@ class BallsController:
         model_dir =  os.path.join(current_dir, "my_model.pt")
         self.model_path = model_dir
         print(self.model_path)
-        ret, frame = self.cap.read()
-        if ret:
-            self.width = frame.shape[1]
-        else:
-            self.width = 640  # Valore di default se il frame non viene catturato
+        self.width = 640  # Valore di default se il frame non viene catturato
         self.model = YOLO(self.model_path)
         # Inizializza il PID con il setpoint al centro del frame
         self.pid = gpPID(P=2, I=0, D=0.1, setpoint=self.width / 2)
         
-        # Soglia per determinare se la palla è "vicino"
-        self.ball_threshold = 200
-        self.green_threshold = 400
+        # Soglia per determinare se la palla è "vicino" (in percentuale della w della telecamera)
+        self.ball_threshold = 0.5 
+        self.green_threshold = 0.9
 
         self.inseguendo_pallina = True #se è false allora 
         self.intervallo_verdi = ([35, 100, 50], [85, 255, 255])
 
         self.timer_obiettivo = 0
+        self.width_frame,self.height_frame = 640,320 #poi in main le aggiorniamo ogni volta
 
         self.ric_cassonetto_verde = RiconosciColori(self.intervallo_verdi[0],self.intervallo_verdi[1],10)
 
@@ -69,7 +66,7 @@ class BallsController:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
                     # La palla è considerata "vicina" se la larghezza della bbox supera la soglia
-                    vicino = bbox_width > self.ball_threshold
+                    vicino = bbox_width > self.width_frame*self.ball_threshold
                     if vicino:
                         print("PALLA VICINA!!!!")
                         self.inseguendo_pallina = False
@@ -89,7 +86,7 @@ class BallsController:
             x,y,w,h = verdi[0]
             cx = (x+x+w)//2
             bbox_width = (x+w)-x
-            vicino = bbox_width>self.green_threshold
+            vicino = bbox_width>self.width_frame*self.green_threshold
             if vicino:
                 print("Deposita pallina!!!")
                 self.inseguendo_pallina = True
@@ -100,9 +97,10 @@ class BallsController:
 
     def prendi_pallina(self):
         ArduinoManager.send_motor_commands(0,0)
-        ArduinoManager.set_servo()
+        #ArduinoManager.set_servo() DA asdawswwsWDAWDwaw
 
-    def main(self,frame):
+    def main(self,frame,dimensions):
+        self.width_frame,self.height_frame = dimensions
         if self.inseguendo_pallina == True:
             self.riconosci_palla_argento(frame)
         else:

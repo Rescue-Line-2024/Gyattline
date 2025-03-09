@@ -105,7 +105,7 @@ class Robot:
             pen_multiplier=0.1,
             cam_resolution=(width, height),
             min_area=50,
-            cut_percentage=0.6,
+            cut_percentage=0.7,
             motor_limit=30
         )
         
@@ -122,7 +122,7 @@ class Robot:
 
                 #IL seguilinea tornerà un json con l'azione e il dato
                 if self.raccogliendo_palle:
-                    pass #vediamo sesso
+                    self.zonapalle.main(frame,(width,height))
                 else:
                     Line_follower.follow_line(frame)
 
