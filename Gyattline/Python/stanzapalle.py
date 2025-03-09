@@ -5,9 +5,11 @@ import os
 import sys
 from ultralytics import YOLO  # Libreria per il rilevamento oggetti (YOLO)
 from PID import gpPID       # Classe PID per il controllo dell'allineamento
+from ArduinoManager import ArduinoManager
+from ric_colori import RiconosciColori
 
-class RobotController:
-    def __init__(self, cap):
+class BallsController:
+    def __init__(self):
         """
         Inizializza il sistema:
          - cap: oggetto VideoCapture (es. cv2.VideoCapture(0))
@@ -17,7 +19,6 @@ class RobotController:
         model_dir =  os.path.join(current_dir, "my_model.pt")
         self.model_path = model_dir
         print(self.model_path)
-        self.cap = cap
         ret, frame = self.cap.read()
         if ret:
             self.width = frame.shape[1]
@@ -25,10 +26,18 @@ class RobotController:
             self.width = 640  # Valore di default se il frame non viene catturato
         self.model = YOLO(self.model_path)
         # Inizializza il PID con il setpoint al centro del frame
-        self.pid = gpPID(P=2, I=0.01, D=0.1, setpoint=self.width / 2)
+        self.pid = gpPID(P=2, I=0, D=0.1, setpoint=self.width / 2)
         
         # Soglia per determinare se la palla è "vicino"
         self.ball_threshold = 200
+        self.green_threshold = 400
+
+        self.inseguendo_pallina = True #se è false allora 
+        self.intervallo_verdi = ([35, 100, 50], [85, 255, 255])
+
+        self.timer_obiettivo = 0
+
+        self.ric_cassonetto_verde = RiconosciColori(self.intervallo_verdi[0],self.intervallo_verdi[1],10)
 
     def riconosci_palla_argento(self, frame):
         """
@@ -41,6 +50,7 @@ class RobotController:
         results = self.model(frame)
         for result in results:
             for box in result.boxes:
+                self.timer_obiettivo = time.time()
                 cls = int(box.cls[0])      # Classe 0 = palla nera, 1 = palla argentata
                 conf = float(box.conf[0])
                 if conf > 0.5 and (cls == 1 or cls == 0):
@@ -60,37 +70,54 @@ class RobotController:
                     
                     # La palla è considerata "vicina" se la larghezza della bbox supera la soglia
                     vicino = bbox_width > self.ball_threshold
-                    return {"color": "silver", "vicino": vicino, "correzione": correzione}
-        return None
+                    if vicino:
+                        print("PALLA VICINA!!!!")
+                        self.inseguendo_pallina = False
 
-    def run(self):
-        """
-        Ciclo principale che:
-         - Cattura continuamente i frame dalla webcam
-         - Analizza il frame per rilevare la palla argentata
-         - Visualizza il frame aggiornato con le bounding box disegnate
-        """
-        while True:
-            ret, frame = self.cap.read()
-            if not ret:
-                continue
-            
-            ball_info = self.riconosci_palla_argento(frame)
-            if ball_info:
-                print("Palla rilevata:", ball_info)
-            else:
-                print("Palla non rilevata")
-            
-            cv2.imshow("Frame", frame)
-            # Premere 'q' per uscire dal loop
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+                    DX,SX = self.pid.calcolapotenzamotori(correzione,20)
+                    ArduinoManager.send_motor_commands(DX,SX)
+                    return
+                
+        
+                    
 
-        self.cap.release()
-        cv2.destroyAllWindows()
+    def insegui_cassonetto_verde(self,frame):
+        verdi = self.ric_cassonetto_verde.riconosci_colore(frame)
+        if verdi:
+            self.timer_obiettivo = time.time()
+            self.ric_cassonetto_verde.disegna_bbox(verdi)
+            x,y,w,h = verdi[0]
+            cx = (x+x+w)//2
+            bbox_width = (x+w)-x
+            vicino = bbox_width>self.green_threshold
+            if vicino:
+                print("Deposita pallina!!!")
+                self.inseguendo_pallina = True
 
-# Esempio di utilizzo:
-if __name__ == "__main__":
-    cap = cv2.VideoCapture(0)
-    robot = RobotController(cap)
-    robot.run()
+            error = self.pid.calcolopid(cx)
+            DX,SX  = self.pid.calcolapotenzamotori(error,25)
+            ArduinoManager.send_motor_commands(DX,SX)
+
+    def prendi_pallina(self):
+        ArduinoManager.send_motor_commands(0,0)
+        ArduinoManager.set_servo()
+
+    def main(self,frame):
+        if self.inseguendo_pallina == True:
+            self.riconosci_palla_argento(frame)
+        else:
+            self.insegui_cassonetto_verde(frame)
+
+        if time.time() - self.timer_obiettivo > 3: #se hai perso la pallina/cassonetto da 3 sec
+            ArduinoManager.send_motor_commands(-25,25)
+            time.sleep(1)
+            ArduinoManager.send_motor_commands(0,0)
+            time.sleep(1)
+        
+
+    
+
+
+        
+
+

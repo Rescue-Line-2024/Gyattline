@@ -107,7 +107,7 @@ class Seguilinea:
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
-                elif green_decision == "DOPPIO":
+                elif green_decision == "DOPPIO!":
                     logging.info("Marker verdi doppi: gestione speciale da implementare")
                     self.last_green_direction = "DOPPIO"
                     deviation = self.pid_manager.compute_deviation(0, h, self.cut_y) #girerà su se stesso

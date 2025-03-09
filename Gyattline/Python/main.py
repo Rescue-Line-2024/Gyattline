@@ -1,10 +1,9 @@
-
-
 from threading import Thread, Lock
 from Serial import SerialConnection  # Assumendo che la classe per la seriale sia salvata qui
 from ric_colori import RiconosciColori
 from Seguilinea import Seguilinea
 from ArduinoManager import ArduinoManager
+from stanzapalle import BallsController
 import cv2
 import time
 
@@ -19,9 +18,14 @@ class Robot:
         self.serial_thread = Thread(target=self.serial_communication)
         self.camera_thread = Thread(target=self.camera_main)
 
+        self.zonapalle = BallsController()
+        self.raccogliendo_palle = False
+
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
+
+
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
@@ -48,7 +52,10 @@ class Robot:
                                 self.stop_signal = True
                             elif response["action"] == "ARGENTO":
                                 print("ARGENTOOOO!!!")
+                                ArduinoManager.send_motor_commands(0,0)
                                 time.sleep(1)
+                                self.raccogliendo_palle = True
+
                             else:
                                 print(f"Messaggio ricevuto: {response}")
                     
@@ -76,6 +83,7 @@ class Robot:
         Funzione principale con videocamera.
         """
         cam = cv2.VideoCapture(0)
+        
         if not cam.isOpened():
             print("Errore nell'apertura della camera.")
             return
@@ -113,14 +121,16 @@ class Robot:
                 frame_colori = frame.copy()
 
                 #IL seguilinea tornerà un json con l'azione e il dato
-                
-                Line_follower.follow_line(frame)
+                if self.raccogliendo_palle:
+                    pass #vediamo sesso
+                else:
+                    Line_follower.follow_line(frame)
 
                 # Mostra i frame
                 try:
                     pass
-                    #cv2.imshow("Camera principale", frame)
-                    #cv2.imshow("Rilevamento colori", frame_colori)
+                    cv2.imshow("Camera principale", frame)
+                    cv2.imshow("Rilevamento colori", frame_colori)
                 except:
                     pass
 

@@ -74,20 +74,7 @@ void impostaservo(int gradi, int pin) {
   board1.setPWM(pin, 0, angleToPulse(gradi));
 }
 
-void gestiscibraccio(int gradi) {
-  impostaservo(180 - gradi, 9);
-  impostaservo(gradi, 8);
-}
 
-void apribracci() {
-  impostaservo(20, 13);   // 20: braccio aperto (70: chiuso)
-  impostaservo(180, 14);  // 180: aperto (135: chiuso)
-}
-
-void chiudibracci() {
-  impostaservo(60, 13);   // 60: posizione per chiudere (rispetto a 20 aperto e 70 chiuso)
-  impostaservo(60, 14);
-}
 
 // Converte un angolo (0-180) in un valore di pulse per il servo
 int angleToPulse(int ang) {
@@ -127,6 +114,12 @@ void setup() {
   board1.setPWMFreq(60);      
   AvviaServoAvanti(10, 10);
   AvviaServoIndietro(10, 10);
+
+  impostaservo(160,6); //telecamera 200 quasi tutta su 160 giu
+  impostaservo(100,4); //braccio destro 30 chiuso 100 aperto
+
+
+
  
   // Configurazione del pin analogico (se necessario)
   pinMode(12,INPUT);
@@ -191,11 +184,19 @@ void loop() {
       Serial.println();
     }
 
+  
+
     if(digitalRead(12)){
-    StaticJsonDocument<200> response;
-    response["action"] = "ARGENTO";
-    serializeJson(response,Serial);
-    Serial.println();
+      StaticJsonDocument<200> response;
+      response["action"] = "ARGENTO";
+      serializeJson(response,Serial);
+      Serial.println();
+    }
+
+    if(Action == "set_servo"){
+      int pin = response["pin"];
+      int grad = response["grad"];
+      impostaservo(grad,pin);
     }
 
   }
