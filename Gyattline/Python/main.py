@@ -96,17 +96,17 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        pid_params = (2, 0, 0)
+        pid_params = (2, 0, 3)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
             pid_params=pid_params,
-            P2=1.5,
-            pen_multiplier=0.1,
+            P2=1,
+            pen_multiplier=0.5,
             cam_resolution=(width, height),
             min_area=50,
-            cut_percentage=0.7,
-            motor_limit=30
+            cut_percentage=0.6,
+            motor_limit=25
         )
         
         
@@ -119,6 +119,19 @@ class Robot:
                     break
 
                 frame_colori = frame.copy()
+                                # Zoom del frame
+                zoom_factor = 1.3  # Puoi aumentare o diminuire questo valore per modificare lo zoom
+                h, w, _ = frame.shape
+                new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
+
+                x1 = (w - new_w) // 2
+                y1 = (h - new_h) // 2
+                x2 = x1 + new_w
+                y2 = y1 + new_h
+
+                # Ritaglio e ridimensionamento
+                frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
+                frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
 
                 #IL seguilinea tornerà un json con l'azione e il dato
                 if self.raccogliendo_palle:

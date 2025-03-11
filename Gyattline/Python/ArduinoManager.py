@@ -30,7 +30,7 @@ class ArduinoManager:
     motor_limit = 30
     last_obstacle_position = None
     obstacle_counter = 0
-    pid_wall = gpPID(10, 0, 0, -1, 7)
+    pid_wall = gpPID(10, 0, 0, -1, 5)
 
     @classmethod
     def limit_motor(cls, motor):
@@ -62,7 +62,7 @@ class ArduinoManager:
         Se il sensore frontale rileva un ostacolo (ad esempio, distanza < 15 cm),
         esegue la procedura di schivata.
         """
-        if cls.front_sensor is not None and cls.front_sensor < 15:
+        if cls.front_sensor is not None and cls.front_sensor < 10:
             cls.obstacle_counter+=1
 
             if cls.obstacle_counter >= 3:
@@ -106,7 +106,7 @@ class ArduinoManager:
                 time.sleep(obstacle_sleep * 2)
 
                 cls.send_motor_commands(cls.motor_limit, cls.motor_limit)
-                time.sleep(obstacle_sleep / 2)
+                time.sleep(obstacle_sleep // 4)
                 # In un ciclo di correzione si potrebbe verificare il ripristino della linea
                 # (qui semplificato: si esce subito)
                 cls.front_sensor = None
@@ -128,9 +128,18 @@ class ArduinoManager:
             print("sensore usato:", sensor)
             dev = cls.pid_wall.calcolopid(sensor)
             dev = np.clip(dev, -100, 100)
-            motor_dx, motor_sx = cls.pid_wall.calcolapotenzamotori(dev)
+            
+            motor_dx, motor_sx = (10,25) if sensor > 4 else (25,0)
+            if sensor > 10:
+                motor_dx, motor_sx = (0,25)
+                
+        
+                
             print("motori:", motor_dx, motor_sx)
             cls.send_motor_commands(motor_dx, motor_sx)
+            time.sleep(0.1)
+            cls.request_sensor_data()
+            time.sleep(0.1)
 
     @classmethod
     def set_servo(cls,pin,grad):

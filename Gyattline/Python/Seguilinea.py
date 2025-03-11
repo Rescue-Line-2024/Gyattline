@@ -53,17 +53,17 @@ class Seguilinea:
             self.sensor_timer = time.time()
             return
         
-        if(ArduinoManager.handle_obstacle(1.3) == True) and self.avoiding_obstacle == False:
+        if(ArduinoManager.handle_obstacle(1) == True) and self.avoiding_obstacle == False:
                 #incomincia schivata ostacolo
                 self.avoiding_obstacle = True
 
         if self.avoiding_obstacle == True:
             self.sensor_request_interval = 0.1
             ArduinoManager.pass_obstacle()
-
-            if self.w > 400:
+            print(self.w)
+            if self.w > 200:
                 print("ostacolo schivato!")
-                ArduinoManager.motor_limit = 35
+                ArduinoManager.motor_limit = 25
                 self.sensor_request_interval = 0.5
                 self.avoiding_obstacle = False
             else:
@@ -72,6 +72,7 @@ class Seguilinea:
 
             
         if line_bboxes is not None:
+            
             # Aggiorno l'altezza (cut_y) della mask ottenuta dal rilevamento della linea
             self.cut_y = self.line_analyzer.binary_mask.shape[0]
 
@@ -79,7 +80,7 @@ class Seguilinea:
             # Prendi la prima bounding box rilevata
             x, y, w, h = line_bboxes[0]
 
-            is_line_centered = x > 30 and x+w < self.cam_x-30 #per vedere se la linea si trova più o meno al centro
+            is_line_centered = x > 10 and x+w < self.cam_x-10 #per vedere se la linea si trova più o meno al centro
             # Ripristino la coordinata y nel sistema completo
             y_original = y + int(self.cam_y * self.cut_percentage)
             adjusted_bbox = (x, y_original, w, h)
@@ -99,7 +100,7 @@ class Seguilinea:
                 if green_decision == "DX":
                     logging.info("Marker verde: gira a destra")
                     self.last_green_direction = "DX"
-                    deviation = self.pid_manager.compute_deviation_h(x+w, h, self.cut_y,is_line_centered)
+                    deviation = self.pid_manager.compute_deviation_h((x+w) , h, self.cut_y,is_line_centered)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
@@ -116,6 +117,7 @@ class Seguilinea:
                     deviation = self.pid_manager.compute_deviation_h(0, h, self.cut_y,is_line_centered) #girerà su se stesso
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
+                    time.sleep(1.5)
                     return
                     # Inserisci qui la logica specifica se necessario.
 
@@ -147,7 +149,7 @@ class Seguilinea:
             points = self.pid_manager.find_line_centers(
                 binary_mask=self.line_analyzer.binary_mask, 
                 cut_y=self.cut_y, 
-                offset=10, 
+                offset=5, 
                 start=0,
                 cam_y=self.cam_y, 
                 cut_percentage=self.cut_percentage
@@ -171,7 +173,7 @@ class Seguilinea:
                 center_line_y = (y_original + y_original + h) // 2
                 cv2.circle(frame, (center_line_x, center_line_y), 5, (255, 0, 0), -1)
                 deviation = self.pid_manager.compute_deviation_h(center_line_x, h, self.cut_y,is_line_centered)
-            
+                print("deviazione: ",deviation,"centro:",center_line_x)
             motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
             ArduinoManager.send_motor_commands(motor_dx, motor_sx)
             

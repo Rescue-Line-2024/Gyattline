@@ -59,16 +59,23 @@ class LineGreenAnalyzer:
         valid_greens = []
         for green in green_positions:
             x, y, w, h = green["coords"]
-            if (y + h) > cam_y * 0.7 and (y+h) < cam_y * 0.95 :  # Considera solo quelli nella parte inferiore
+            if (y + h) > cam_y * 0.9:  # Considera solo quelli nella parte inferiore
                 valid_greens.append(green)
         if len(valid_greens) == 1:
             self.last_verde = valid_greens[0]["position"]
             return valid_greens[0]["position"]
         elif len(valid_greens) == 2:
-            if time.time()-self.timer_verdi > 1:
-                return "DOPPIO!"
-            else:
-                return self.last_verde
+            if time.time()-self.timer_verdi > 0.5:
+                x1,y1,w1,h1 = valid_greens[0]["coords"]
+                x2,y2,w2,h2 = valid_greens[1]["coords"]
+                
+                if (y1+h1 == cam_y and y2+h2 == cam_y and (x1 > 5 and x1+w1 < cam_x-5)
+                and (x2 > 5 and x2+w2 < cam_x-5)):
+                    return "DOPPIO!"
+                else:
+                    self.timer_verdi = time.time()
+            
+            return self.last_verde
 
 
         else:

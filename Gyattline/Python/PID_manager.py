@@ -22,11 +22,12 @@ class PIDManager:
     def compute_deviation_h(self, center_line_x, bbox_height, total_height,is_line_centered):
         deviation = self.pid_follow.calcolopid(center_line_x)
         multiplicator_h = max(0.1, bbox_height / total_height)
-        deviation /= multiplicator_h
+        
 
         if is_line_centered:
             return deviation
         else:
+            deviation /= multiplicator_h
             print("Mul:",multiplicator_h)
             return deviation * self.P2
 
