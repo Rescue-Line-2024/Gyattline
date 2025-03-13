@@ -116,7 +116,10 @@ void setup() {
   AvviaServoIndietro(10, 10);
 
   impostaservo(160,6); //telecamera 200 quasi tutta su 160 giu
-  impostaservo(100,4); //braccio destro 30 chiuso 100 aperto
+  impostaservo(80,4); //130 chiuso 80 aperto mano sinistra
+  impostaservo(100, 5); //mano destro 30 chiuso 100 aperto
+  impostaservo(130,9); //130 su //10 giu braccio
+
 
 
 
@@ -139,6 +142,23 @@ void setup() {
   
 }
 
+void apri_mani()
+{
+  impostaservo(80,4); //130 chiuso 80 aperto mano sinistra
+  impostaservo(100, 5); //mano destro 30 chiuso 100 aperto
+}
+
+void chiudi_mani()
+{
+  impostaservo(130,4); //130 chiuso 80 aperto mano sinistra
+  impostaservo(30, 5); //mano destro 30 chiuso 100 aperto
+}
+void braccio_su(){
+impostaservo(130,9); //120 su //20 giu braccio
+}
+void braccio_giu(){
+impostaservo(10,9); //120 su //20 giu braccio
+}
 // --------------------------
 // LOOP PRINCIPALE
 // --------------------------
@@ -194,11 +214,19 @@ void loop() {
     }
 
     if(Action == "set_servo"){
-      int pin = response["pin"];
-      int grad = response["grad"];
-      impostaservo(grad,pin);
+      impostaservo(200,6); //telecamera 200 quasi tutta su 160 giu
     }
 
+    if(Action == "pinza"){
+      if (doc["data"] == "apri_mani")
+        apri_mani();
+      if (doc["data"] == "chiudi_mani")
+        chiudi_mani();
+      if(doc["data"] == "apri_braccia")
+        braccio_su();
+      if(doc["data"] == "chiudi_braccia")
+        braccio_giu();
+    }
   }
 
 }

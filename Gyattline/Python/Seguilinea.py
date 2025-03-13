@@ -36,6 +36,7 @@ class Seguilinea:
 
         self.sensor_timer = time.time()
         self.sensor_request_interval = 0.5
+        self.sensor_counter = 0
         self.w = 0
 
     def follow_line(self, frame):
@@ -50,10 +51,16 @@ class Seguilinea:
         if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
             ArduinoManager.request_sensor_data()
             print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
+            if ArduinoManager.front_sensor is not None:
+                if ArduinoManager.front_sensor < 15:
+                    self.sensor_counter +=1
+                else:
+                    self.sensor_counter = 0
+
             self.sensor_timer = time.time()
             return
         
-        if(ArduinoManager.handle_obstacle(1) == True) and self.avoiding_obstacle == False:
+        if(ArduinoManager.handle_obstacle(1) == True) and self.avoiding_obstacle == False and self.sensor_counter >= 2:
                 #incomincia schivata ostacolo
                 self.avoiding_obstacle = True
 
@@ -64,6 +71,12 @@ class Seguilinea:
             if self.w > 200:
                 print("ostacolo schivato!")
                 ArduinoManager.motor_limit = 25
+                if ArduinoManager.last_obstacle_position == "right":
+                    ArduinoManager.send_motor_commands(25,-25)
+                else:
+                    ArduinoManager.send_motor_commands(-25,25)
+                time.sleep(0.5)
+
                 self.sensor_request_interval = 0.5
                 self.avoiding_obstacle = False
             else:

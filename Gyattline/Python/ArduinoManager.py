@@ -63,62 +63,56 @@ class ArduinoManager:
         esegue la procedura di schivata.
         """
         if cls.front_sensor is not None and cls.front_sensor < 10:
-            cls.obstacle_counter+=1
+            logging.info("Ostacolo rilevato!")
+            # Ferma i motori
+            cls.send_motor_commands(0, 0)
+            time.sleep(0.05)
+            cls.send_motor_commands(0, 0)
+            time.sleep(0.05)
+            
+            # Richiedi aggiornamento dei sensori
+            cls.request_sensor_data()
+            time.sleep(0.1)
+            
+            if cls.left_sensor is None or cls.right_sensor is None:
+                logging.warning("Sensori laterali non disponibili!")
+                return False
+            
+            # Scegli la direzione in base allo spazio laterale
+            direction = "right" if cls.right_sensor > cls.left_sensor else "left"
+            if cls.right_sensor < 1:
+                direction = "left"
+            elif cls.left_sensor < 1:
+                direction = "right"
+            
+            logging.info(f"Schivata ostacolo: giro verso {direction}")
+            # Muovi all'indietro per un attimo
+            cls.send_motor_commands(-cls.motor_limit, -cls.motor_limit)
+            print("INDIETRO!")
+            time.sleep(obstacle_sleep)
+            # Ruota in base alla direzione scelta
+            if direction == "right":
+                cls.send_motor_commands(-cls.motor_limit, cls.motor_limit)
+                print("DESTRA!!")
+                cls.pid_wall.inverted = -1
+            else:
+                cls.send_motor_commands(cls.motor_limit, -cls.motor_limit)
+                print("SINISTRA!!!")
+                cls.pid_wall.inverted = 1
 
-            if cls.obstacle_counter >= 30000:
-                logging.info("Ostacolo rilevato!")
-                # Ferma i motori
-                cls.send_motor_commands(0, 0)
-                time.sleep(0.05)
-                cls.send_motor_commands(0, 0)
-                time.sleep(0.05)
-                
-                # Richiedi aggiornamento dei sensori
-                cls.request_sensor_data()
-                time.sleep(0.1)
-                
-                if cls.left_sensor is None or cls.right_sensor is None:
-                    logging.warning("Sensori laterali non disponibili!")
-                    return False
-                
-                # Scegli la direzione in base allo spazio laterale
-                direction = "right" if cls.right_sensor > cls.left_sensor else "left"
-                if cls.right_sensor < 1:
-                    direction = "left"
-                elif cls.left_sensor < 1:
-                    direction = "right"
-                
-                logging.info(f"Schivata ostacolo: giro verso {direction}")
-                # Muovi all'indietro per un attimo
-                cls.send_motor_commands(-cls.motor_limit, -cls.motor_limit)
-                print("INDIETRO!")
-                time.sleep(obstacle_sleep)
-                # Ruota in base alla direzione scelta
-                if direction == "right":
-                    cls.send_motor_commands(-cls.motor_limit, cls.motor_limit)
-                    print("DESTRA!!")
-                    cls.pid_wall.inverted = -1
-                else:
-                    cls.send_motor_commands(cls.motor_limit, -cls.motor_limit)
-                    print("SINISTRA!!!")
-                    cls.pid_wall.inverted = 1
+            time.sleep(obstacle_sleep * 2)
 
-                time.sleep(obstacle_sleep * 2)
+            cls.send_motor_commands(cls.motor_limit, cls.motor_limit)
+            time.sleep(obstacle_sleep // 4)
+            # In un ciclo di correzione si potrebbe verificare il ripristino della linea
+            # (qui semplificato: si esce subito)
+            cls.front_sensor = None
+            cls.left_sensor = None
+            cls.right_sensor = None
 
-                cls.send_motor_commands(cls.motor_limit, cls.motor_limit)
-                time.sleep(obstacle_sleep // 4)
-                # In un ciclo di correzione si potrebbe verificare il ripristino della linea
-                # (qui semplificato: si esce subito)
-                cls.front_sensor = None
-                cls.left_sensor = None
-                cls.right_sensor = None
-
-                cls.last_obstacle_position = direction
-                return True 
-            return False
-        else:
-            cls.obstacle_counter = 0
-            return False
+            cls.last_obstacle_position = direction
+            return True 
+        return False
 
     @classmethod
     def pass_obstacle(cls):

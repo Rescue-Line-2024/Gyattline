@@ -65,11 +65,11 @@ class LineGreenAnalyzer:
             self.last_verde = valid_greens[0]["position"]
             return valid_greens[0]["position"]
         elif len(valid_greens) == 2:
-            if time.time()-self.timer_verdi > 0.3:
+            if time.time()-self.timer_verdi > 0.2:
                 x1,y1,w1,h1 = valid_greens[0]["coords"]
                 x2,y2,w2,h2 = valid_greens[1]["coords"]
                 
-                if (y1+h1 == cam_y and y2+h2 == cam_y and (x1 > 5 and x1+w1 < cam_x-5)
+                if (y1+h1 >= cam_y-10 and y2+h2 >= cam_y-10 and (x1 > 5 and x1+w1 < cam_x-5)
                 and (x2 > 5 and x2+w2 < cam_x-5)):
                     return "DOPPIO!"
                 else:

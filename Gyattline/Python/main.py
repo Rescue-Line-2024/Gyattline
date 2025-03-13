@@ -6,27 +6,40 @@ from ArduinoManager import ArduinoManager
 from stanzapalle import BallsController
 import cv2
 import time
-
+try:
+    import RPi.GPIO as GPIO  # Import della libreria per i GPIO
+except:
+    print("probabilmente non sei su raspberry")
 
 class Robot:
     def __init__(self):
-        
         self.stop_signal = False  # Segnale per terminare i thread
         self.lock = Lock()  # Lock per sincronizzare l'accesso ai dati condivisi
         ArduinoManager.motor_limit = 30
+
+        # Configurazione del GPIO 16 (modalità BCM, pin 16 in input con pull-down)
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        except:
+            print("errore nel configurare il GPOI")
+
         # Inizializza i thread
         self.serial_thread = Thread(target=self.serial_communication)
         self.camera_thread = Thread(target=self.camera_main)
+        self.gpio_thread = Thread(target=self.gpio_monitor)  # Thread per monitorare il GPIO 16
 
         self.zonapalle = BallsController()
         self.raccogliendo_palle = False
         self.riconoscendo_argento = False
 
+        # Istanza per il riconoscimento del rosso.
+        self.riconosci_rosso = RiconosciColori([0, 150, 150], [10, 255, 255], min_area=500)
+
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
-
-
+        self.gpio_thread.start()
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
@@ -34,7 +47,6 @@ class Robot:
             conn.open_connection()
             
             while not self.stop_signal:  # Loop infinito finché non viene inviato il segnale di stop
-                
                 response = conn.read_message()
                 if response:
                     try:
@@ -46,7 +58,6 @@ class Robot:
                         if "right" in response:
                             ArduinoManager.right_sensor = response["right"]
                         
-                        
                         # Gestione di altri tipi di messaggi
                         if "action" in response:
                             if response["action"] == "stop":
@@ -54,36 +65,41 @@ class Robot:
                                 self.stop_signal = True
                             elif response["action"] == "ARGENTO":
                                 print("ARGENTOOOO!!!")
-                                ArduinoManager.send_motor_commands(0,0)
+                                ArduinoManager.send_motor_commands(0, 0)
                                 time.sleep(1)
                                 self.raccogliendo_palle = True
                                 self.riconoscendo_argento = True
                             else:
                                 self.riconoscendo_argento = False
-
-                       
                     
                     except Exception as e:
                         print("Errore nel parsing del messaggio:", e)
                 
                 # Invio di comandi all'Arduino se presenti
-                
-                #ArduinoManager.set_servo(6,200)
-                
                 with ArduinoManager.message_lock:
                     if ArduinoManager.message is not None:
                         conn.send_message(ArduinoManager.message)
                         time.sleep(0.05)  # Piccola pausa per evitare di sovraccaricare la CPU
                         ArduinoManager.message = None
-                
-                
-
+                        
         except Exception as e:
             print("Errore nella comunicazione seriale:", e)
-
         finally:
+            ArduinoManager.send_motor_commands(0, 0)
             conn.close_connection()
 
+    def gpio_monitor(self):
+        """
+        Monitora lo stato del GPIO 16.
+        Appena il pin passa ad HIGH (connessione rilevata), imposta self.raccogliendo_palle a False.
+        """
+        while not self.stop_signal:
+            gpio_state = GPIO.input(16)
+            if gpio_state == GPIO.HIGH:
+                if self.raccogliendo_palle:
+                    print("GPIO 16: connessione rilevata. Imposto 'raccogliendo_palle' a False.")
+                    self.raccogliendo_palle = False
+            time.sleep(0.1)
 
     def camera_main(self):
         """
@@ -95,8 +111,8 @@ class Robot:
             print("Errore nell'apertura della camera.")
             return
 
-        desired_width = 120
-        desired_height = 80
+        desired_width = 320
+        desired_height = 240
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, desired_width)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
 
@@ -114,10 +130,8 @@ class Robot:
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
-            motor_limit=20
+            motor_limit=25
         )
-        
-        
         
         try:
             while not self.stop_signal:
@@ -128,13 +142,27 @@ class Robot:
 
                 frame_colori = frame.copy()
                 
+                # Se si sta riconoscendo l'argento, vengono applicate alcune modifiche
+                                # *** Riconoscimento del ROSSO ***
+                red_boxes = self.riconosci_rosso.riconosci_colore(frame_colori)
+                if red_boxes is not None:
+                    print("Rilevato rosso: fermo i motori!")
+                    # Disegna le bounding box sul frame (colore rosso)
+                    self.riconosci_rosso.disegna_bbox(red_boxes, frame, (0, 0, 255))
+                    ArduinoManager.send_motor_commands(0, 0)
+                    # Mostra i frame aggiornati e passa alla prossima iterazione
+                    cv2.imshow("Camera principale", frame)
+                    cv2.imshow("Rilevamento colori", frame_colori)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        Seguilinea.messaggio = {"action": "stop"}
+                        self.stop_signal = True
+                    continue
 
-                #IL seguilinea tornerà un json con l'azione e il dato
-                if self.riconoscendo_argento == True:
+                if self.riconoscendo_argento:
                     ArduinoManager.motor_limit = 15
-                    ArduinoManager.set_servo(6,200)
+                    ArduinoManager.set_servo(6, 200)
                 if self.raccogliendo_palle:
-                    self.zonapalle.main(frame,(width,height))
+                    self.zonapalle.main(frame, (width, height))
                 else:
                     zoom_factor = 1.2  # Puoi aumentare o diminuire questo valore per modificare lo zoom
                     h, w, _ = frame.shape
@@ -152,22 +180,20 @@ class Robot:
 
                 # Mostra i frame
                 try:
-                    pass
                     cv2.imshow("Camera principale", frame)
                     cv2.imshow("Rilevamento colori", frame_colori)
-                except:
-                    pass
-
-            
-
+                except Exception as e:
+                    print("Errore nell'apertura delle finestre:", e)
+                
                 # Interrompi con il tasto 'q'
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    Seguilinea.messaggio = {"action" : "stop"}
+                    Seguilinea.messaggio = {"action": "stop"}
                     self.stop_signal = True
                     break
 
         except KeyboardInterrupt:
-            print("keyboard interrupt rilevato")
+            print("Keyboard interrupt rilevato")
+            ArduinoManager.send_motor_commands(0, 0)
             cam.release()
             cv2.destroyAllWindows()
         finally:
@@ -180,8 +206,9 @@ class Robot:
         """
         self.serial_thread.join()
         self.camera_thread.join()
-
+        self.gpio_thread.join()
+        GPIO.cleanup()
 
 if __name__ == "__main__":
     robot = Robot()
-    #robot.join_threads()
+    # robot.join_threads()  # Puoi chiamare join_threads() se desideri attendere la terminazione dei thread

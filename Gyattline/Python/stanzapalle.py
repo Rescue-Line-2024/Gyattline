@@ -45,15 +45,24 @@ class BallsController:
         time.sleep(0.5)
         ArduinoManager.send_message("pinza","chiudi_braccia")
         print("abbasso braccia")
-        time.sleep(0.5)
+        time.sleep(2)
         ArduinoManager.send_motor_commands(10,10)
         time.sleep(0.5)
         ArduinoManager.send_message("pinza","chiudi_mani")
         print("chiudo_mani")
-        time.sleep(0.2)
+        time.sleep(1)
         ArduinoManager.send_message("pinza","apri_braccia")
         print("alzo braccia")
+        time.sleep(1)
+
+    def deposita_pallina(self):
+        print("Rilascio della pallina: apro le mani")
+        ArduinoManager.send_message("pinza", "chiudi_braccia")
         time.sleep(0.2)
+        ArduinoManager.send_message("pinza", "apri_mani")
+        time.sleep(0.5)
+        ArduinoManager.send_message("pinza","apri_braccia")
+        time.sleep(1)
 
     def riconosci_palla_argento(self, frame):
         """
@@ -117,10 +126,10 @@ class BallsController:
             self.ric_cassonetto_verde.disegna_bbox(verdi)
             x,y,w,h = verdi[0]
             cx = (x+x+w)//2
-            bbox_width = (x+w)-x
-            vicino = bbox_width>self.width*self.green_threshold
+            vicino = y+h > 240 and w > 300
             if vicino:
                 print("Deposita pallina!!!")
+                self.deposita_pallina()
                 self.inseguendo_pallina = True
 
             error = self.pid.calcolopid(cx)
