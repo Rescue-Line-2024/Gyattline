@@ -49,7 +49,7 @@ class Seguilinea:
         
         if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
             ArduinoManager.request_sensor_data()
-            #print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
+            print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
             self.sensor_timer = time.time()
             return
         
@@ -80,7 +80,7 @@ class Seguilinea:
             # Prendi la prima bounding box rilevata
             x, y, w, h = line_bboxes[0]
 
-            is_line_centered = x > 10 and x+w < self.cam_x-10 #per vedere se la linea si trova più o meno al centro
+            is_line_centered = x > 100 and x+w < self.cam_x-100 #per vedere se la linea si trova più o meno al centro
             # Ripristino la coordinata y nel sistema completo
             y_original = y + int(self.cam_y * self.cut_percentage)
             adjusted_bbox = (x, y_original, w, h)
@@ -117,7 +117,7 @@ class Seguilinea:
                     deviation = self.pid_manager.compute_deviation_h(0, h, self.cut_y,is_line_centered) #girerà su se stesso
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
-                    time.sleep(1.5)
+                    time.sleep(1.3)
                     return
                     # Inserisci qui la logica specifica se necessario.
 

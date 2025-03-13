@@ -15,14 +15,17 @@ class BallsController:
          - cap: oggetto VideoCapture (es. cv2.VideoCapture(0))
          - model_path: percorso del modello YOLO
         """
+
         current_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         model_dir =  os.path.join(current_dir, "my_model.pt")
         self.model_path = model_dir
         print(self.model_path)
-        self.width = 640  # Valore di default se il frame non viene catturato
+        self.width = 320  # Valore di default se il frame non viene catturatoas
+        self.height = 240
+        
         self.model = YOLO(self.model_path)
         # Inizializza il PID con il setpoint al centro del frame
-        self.pid = gpPID(P=2, I=0, D=0.1, setpoint=self.width / 2)
+        self.pid = gpPID(P=1, I=0, D=0.1, setpoint=self.width / 2)
         
         # Soglia per determinare se la palla è "vicino" (in percentuale della w della telecamera)
         self.ball_threshold = 0.5 
@@ -32,9 +35,25 @@ class BallsController:
         self.intervallo_verdi = ([35, 100, 50], [85, 255, 255])
 
         self.timer_obiettivo = 0
-        self.width_frame,self.height_frame = 640,320 #poi in main le aggiorniamo ogni volta
+  
 
         self.ric_cassonetto_verde = RiconosciColori(self.intervallo_verdi[0],self.intervallo_verdi[1],10)
+
+
+    def prendi_pallina(self):
+        ArduinoManager.send_motor_commands(0,0)
+        time.sleep(0.5)
+        ArduinoManager.send_message("pinza","chiudi_braccia")
+        print("abbasso braccia")
+        time.sleep(0.5)
+        ArduinoManager.send_motor_commands(10,10)
+        time.sleep(0.5)
+        ArduinoManager.send_message("pinza","chiudi_mani")
+        print("chiudo_mani")
+        time.sleep(0.2)
+        ArduinoManager.send_message("pinza","apri_braccia")
+        print("alzo braccia")
+        time.sleep(0.2)
 
     def riconosci_palla_argento(self, frame):
         """
@@ -66,12 +85,25 @@ class BallsController:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
                     # La palla è considerata "vicina" se la larghezza della bbox supera la soglia
-                    vicino = bbox_width > self.width_frame*self.ball_threshold
+                    vicino = y2 > 220
+                    print("y2:",y2)
                     if vicino:
-                        print("PALLA VICINA!!!!")
+                        ArduinoManager.send_motor_commands(0,0)
+                        time.sleep(1)
+                        print("SONO VICINOOOO!!!!!!!")
+                        '''
+                        if center_x > self.width//2 + 30:
+                            ArduinoManager.send_motor_commands(-7,7)
+                        elif center_x < self.width//2 - 30:
+                            ArduinoManager.send_motor_commands(7,-7)
+                        else:
+
+                        '''
+                        self.prendi_pallina()
                         self.inseguendo_pallina = False
 
-                    DX,SX = self.pid.calcolapotenzamotori(correzione,20)
+                    DX,SX = self.pid.calcolapotenzamotori(correzione)
+                    print("motori:",DX,"  ",SX)
                     ArduinoManager.send_motor_commands(DX,SX)
                     return
                 
@@ -86,31 +118,31 @@ class BallsController:
             x,y,w,h = verdi[0]
             cx = (x+x+w)//2
             bbox_width = (x+w)-x
-            vicino = bbox_width>self.width_frame*self.green_threshold
+            vicino = bbox_width>self.width*self.green_threshold
             if vicino:
                 print("Deposita pallina!!!")
                 self.inseguendo_pallina = True
 
             error = self.pid.calcolopid(cx)
-            DX,SX  = self.pid.calcolapotenzamotori(error,25)
+            DX,SX  = self.pid.calcolapotenzamotori(error,15)
             ArduinoManager.send_motor_commands(DX,SX)
 
-    def prendi_pallina(self):
-        ArduinoManager.send_motor_commands(0,0)
-        #ArduinoManager.set_servo() DA asdawswwsWDAWDwaw
 
     def main(self,frame,dimensions):
-        self.width_frame,self.height_frame = dimensions
+        self.width,self.height_frame = dimensions
         if self.inseguendo_pallina == True:
             self.riconosci_palla_argento(frame)
         else:
             self.insegui_cassonetto_verde(frame)
 
         if time.time() - self.timer_obiettivo > 3: #se hai perso la pallina/cassonetto da 3 sec
-            ArduinoManager.send_motor_commands(-25,25)
-            time.sleep(1)
-            ArduinoManager.send_motor_commands(0,0)
-            time.sleep(1)
+            print("cercando palline . . .")
+            if int(time.time()) %2 == 0:
+                ArduinoManager.send_motor_commands(-25,25)
+            else:
+                ArduinoManager.send_motor_commands(0,0)
+                
+        time.sleep(0.1)           
         
 
     

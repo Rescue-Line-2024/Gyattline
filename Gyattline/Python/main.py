@@ -20,6 +20,7 @@ class Robot:
 
         self.zonapalle = BallsController()
         self.raccogliendo_palle = False
+        self.riconoscendo_argento = False
 
         # Avvia i thread
         self.serial_thread.start()
@@ -33,6 +34,7 @@ class Robot:
             conn.open_connection()
             
             while not self.stop_signal:  # Loop infinito finché non viene inviato il segnale di stop
+                
                 response = conn.read_message()
                 if response:
                     try:
@@ -55,14 +57,19 @@ class Robot:
                                 ArduinoManager.send_motor_commands(0,0)
                                 time.sleep(1)
                                 self.raccogliendo_palle = True
-
+                                self.riconoscendo_argento = True
                             else:
-                                print(f"Messaggio ricevuto: {response}")
+                                self.riconoscendo_argento = False
+
+                       
                     
                     except Exception as e:
                         print("Errore nel parsing del messaggio:", e)
                 
                 # Invio di comandi all'Arduino se presenti
+                
+                #ArduinoManager.set_servo(6,200)
+                
                 with ArduinoManager.message_lock:
                     if ArduinoManager.message is not None:
                         conn.send_message(ArduinoManager.message)
@@ -88,25 +95,26 @@ class Robot:
             print("Errore nell'apertura della camera.")
             return
 
-        desired_width = 160
-        desired_height = 120
+        desired_width = 120
+        desired_height = 80
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, desired_width)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
 
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        pid_params = (2, 0, 3)
+        print("Risoluzione corrente:", width, height)
+        
+        pid_params = (1, 0, 0)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
             pid_params=pid_params,
-            P2=1,
-            pen_multiplier=0.5,
+            P2=1.5,
+            pen_multiplier=0.1,
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
-            motor_limit=25
+            motor_limit=20
         )
         
         
@@ -119,24 +127,27 @@ class Robot:
                     break
 
                 frame_colori = frame.copy()
-                                # Zoom del frame
-                zoom_factor = 1.3  # Puoi aumentare o diminuire questo valore per modificare lo zoom
-                h, w, _ = frame.shape
-                new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
-
-                x1 = (w - new_w) // 2
-                y1 = (h - new_h) // 2
-                x2 = x1 + new_w
-                y2 = y1 + new_h
-
-                # Ritaglio e ridimensionamento
-                frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
-                frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
+                
 
                 #IL seguilinea tornerà un json con l'azione e il dato
+                if self.riconoscendo_argento == True:
+                    ArduinoManager.motor_limit = 15
+                    ArduinoManager.set_servo(6,200)
                 if self.raccogliendo_palle:
                     self.zonapalle.main(frame,(width,height))
                 else:
+                    zoom_factor = 1.2  # Puoi aumentare o diminuire questo valore per modificare lo zoom
+                    h, w, _ = frame.shape
+                    new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
+
+                    x1 = (w - new_w) // 2
+                    y1 = (h - new_h) // 2
+                    x2 = x1 + new_w
+                    y2 = y1 + new_h
+
+                    # Ritaglio e ridimensionamento
+                    frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
+                    frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
                     Line_follower.follow_line(frame)
 
                 # Mostra i frame

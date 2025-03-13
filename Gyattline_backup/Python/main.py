@@ -84,7 +84,7 @@ class Robot:
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        pid_params = (2, 0, 0)
+        pid_params = (1, 0, 0)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
@@ -109,14 +109,26 @@ class Robot:
                 frame_colori = frame.copy()
 
                 #IL seguilinea tornerà un json con l'azione e il dato
-                
+                zoom_factor = 1.3  # Puoi aumentare o diminuire questo valore per modificare lo zoom
+                h, w, _ = frame.shape
+                new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
+
+                x1 = (w - new_w) // 2
+                y1 = (h - new_h) // 2
+                x2 = x1 + new_w
+                y2 = y1 + new_h
+
+                # Ritaglio e ridimensionamento
+                frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
+                frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
+                    
                 Line_follower.follow_line(frame)
 
                 # Mostra i frame
                 try:
                     pass
-                    #cv2.imshow("Camera principale", frame)
-                    #cv2.imshow("Rilevamento colori", frame_colori)
+                    cv2.imshow("Camera principale", frame)
+                    cv2.imshow("Rilevamento colori", frame_colori)
                 except:
                     pass
 

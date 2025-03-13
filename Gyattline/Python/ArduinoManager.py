@@ -65,7 +65,7 @@ class ArduinoManager:
         if cls.front_sensor is not None and cls.front_sensor < 10:
             cls.obstacle_counter+=1
 
-            if cls.obstacle_counter >= 3:
+            if cls.obstacle_counter >= 30000:
                 logging.info("Ostacolo rilevato!")
                 # Ferma i motori
                 cls.send_motor_commands(0, 0)
@@ -145,6 +145,11 @@ class ArduinoManager:
     def set_servo(cls,pin,grad):
         with cls.message_lock:
             cls.message = {"action" : "set_servo" , "pin" : pin , "graduation" : grad}
+
+    @classmethod
+    def send_message(cls,action,data):
+        with cls.message_lock:
+            cls.message = {"action" : action , "data" : data}
 
 
 
