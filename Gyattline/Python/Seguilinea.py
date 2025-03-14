@@ -60,8 +60,10 @@ class Seguilinea:
             self.sensor_timer = time.time()
             return
         
-        if(ArduinoManager.handle_obstacle(1) == True) and self.avoiding_obstacle == False and self.sensor_counter >= 2:
+        if self.avoiding_obstacle == False and self.sensor_counter >= 2:
+            if(ArduinoManager.handle_obstacle(1) == True):
                 #incomincia schivata ostacolo
+                print("sto schivando ostacolo")
                 self.avoiding_obstacle = True
 
         if self.avoiding_obstacle == True:
@@ -72,10 +74,10 @@ class Seguilinea:
                 print("ostacolo schivato!")
                 ArduinoManager.motor_limit = 25
                 if ArduinoManager.last_obstacle_position == "right":
-                    ArduinoManager.send_motor_commands(25,-25)
-                else:
                     ArduinoManager.send_motor_commands(-25,25)
-                time.sleep(0.5)
+                else:
+                    ArduinoManager.send_motor_commands(25,-25)
+                time.sleep(1.5)
 
                 self.sensor_request_interval = 0.5
                 self.avoiding_obstacle = False

@@ -29,7 +29,9 @@ class ArduinoManager:
     right_sensor = None
     motor_limit = 30
     last_obstacle_position = None
+    motor_state = True
     obstacle_counter = 0
+    camera_grad = 160
     pid_wall = gpPID(10, 0, 0, -1, 5)
 
     @classmethod
@@ -126,6 +128,11 @@ class ArduinoManager:
             motor_dx, motor_sx = (10,25) if sensor > 4 else (25,0)
             if sensor > 10:
                 motor_dx, motor_sx = (0,25)
+
+            if cls.last_obstacle_position == "right":
+                temp = motor_dx
+                motor_dx = motor_sx
+                motor_sx = temp
                 
         
                 
@@ -136,9 +143,11 @@ class ArduinoManager:
             time.sleep(0.1)
 
     @classmethod
-    def set_servo(cls,pin,grad):
+    def set_camera(cls,grad):
+        cls.camera_grad = grad
         with cls.message_lock:
-            cls.message = {"action" : "set_servo" , "pin" : pin , "graduation" : grad}
+            print("modificando posizione telecamera")
+            cls.message = {"action" : "set_camera" , "data" : int(grad)}
 
     @classmethod
     def send_message(cls,action,data):

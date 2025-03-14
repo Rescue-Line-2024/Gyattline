@@ -34,7 +34,7 @@ class RiconosciColori:
         
         return array if array else None  # Restituisce None se non ci sono contorni
     
-    def disegna_bbox(self,array,image,color):
+    def disegna_bbox(self,array,image,color=[0,255,0]):
         coordinate = array
         for x,y,w,h in coordinate:
             cv2.rectangle(image,(x,y),(x+w,y+h),color,1)
@@ -45,7 +45,7 @@ class RiconosciColori:
 
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        ret, threshold = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY_INV)
+        ret, threshold = cv2.threshold(blur, 80, 255, cv2.THRESH_BINARY_INV)
 
         RiconosciColori.thresh = threshold
 
