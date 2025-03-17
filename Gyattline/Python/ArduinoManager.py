@@ -64,7 +64,7 @@ class ArduinoManager:
         Se il sensore frontale rileva un ostacolo (ad esempio, distanza < 15 cm),
         esegue la procedura di schivata.
         """
-        if cls.front_sensor is not None and cls.front_sensor < 10:
+        if cls.front_sensor is not None and cls.front_sensor < 15:
             logging.info("Ostacolo rilevato!")
             # Ferma i motori
             cls.send_motor_commands(0, 0)
@@ -91,7 +91,7 @@ class ArduinoManager:
             # Muovi all'indietro per un attimo
             cls.send_motor_commands(-cls.motor_limit, -cls.motor_limit)
             print("INDIETRO!")
-            time.sleep(obstacle_sleep)
+            time.sleep(obstacle_sleep*1.2)
             # Ruota in base alla direzione scelta
             if direction == "right":
                 cls.send_motor_commands(-cls.motor_limit, cls.motor_limit)
@@ -102,10 +102,10 @@ class ArduinoManager:
                 print("SINISTRA!!!")
                 cls.pid_wall.inverted = 1
 
-            time.sleep(obstacle_sleep * 2)
+            time.sleep(obstacle_sleep * 1.7)
 
             cls.send_motor_commands(cls.motor_limit, cls.motor_limit)
-            time.sleep(obstacle_sleep // 4)
+            time.sleep(obstacle_sleep * 2.5)
             # In un ciclo di correzione si potrebbe verificare il ripristino della linea
             # (qui semplificato: si esce subito)
             cls.front_sensor = None

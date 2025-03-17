@@ -33,12 +33,13 @@ class BallsController:
         self.green_threshold = 0.9
 
         self.inseguendo_pallina = True #se è false allora 
-        self.intervallo_verdi = ([35, 50, 30], [85, 255, 255])
+        self.intervallo_verdi = ([40, 80, 80], [85, 255, 255])
 
         self.timer_obiettivo = 0
 
 
         self.ric_cassonetto_verde = RiconosciColori(self.intervallo_verdi[0],self.intervallo_verdi[1],10)
+        self.andato_avanti = False
 
 
     def prendi_pallina(self):
@@ -58,6 +59,8 @@ class BallsController:
 
     def deposita_pallina(self):
         print("Rilascio della pallina: apro le mani")
+        ArduinoManager.send_motor_commands(15,15)
+        time.sleep(3)
         ArduinoManager.send_message("pinza", "chiudi_braccia")
         time.sleep(0.2)
         ArduinoManager.send_message("pinza", "apri_mani")
@@ -98,7 +101,7 @@ class BallsController:
                     vicino = y2 > 220
                     print("y2:",y2)
                     if vicino:
-                        if ArduinoManager.camera_grad == 200:
+                        if True:
                             print("SONO VICINOOOO!!!!!!!")
                             '''
                             if center_x > self.width//2 + 30:
@@ -113,7 +116,7 @@ class BallsController:
                             ArduinoManager.set_camera(205)
                             time.sleep(0.1)
                             return
-                        ArduinoManager.set_camera(200)
+                        ArduinoManager.set_camera(205)
                         ArduinoManager.send_motor_commands(0,0)
                         time.sleep(0.2)
                         
@@ -133,14 +136,17 @@ class BallsController:
         # Trova i contorni nella maschera
         contours, _ = cv2.findContours(mask_verde, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+
+
+        self.timer_obiettivo = time.time()
         if not contours:  # Se non trova contorni, esce dalla funzione
             print("Nessun cassonetto verde trovato")
             return
 
-        self.timer_obiettivo = time.time()
-
         # **Combina i contorni e trova un rettangolo unico**
         contours = np.vstack(contours).astype(np.int32)  # Converte in interi
+        
+        
         x, y, w, h = cv2.boundingRect(contours)
 
         # Disegna la bounding box unica
@@ -152,7 +158,7 @@ class BallsController:
         # Se è vicino abbastanza, deposita la pallina
         vicino = y + h > 230 and w > 280
         if vicino:
-            if ArduinoManager.camera_grad == 200:
+            if True:
                 print("Deposita pallina!!!")
                 self.deposita_pallina()
                 self.inseguendo_pallina = True
@@ -170,6 +176,10 @@ class BallsController:
 
 
     def main(self,frame,dimensions):
+        if self.andato_avanti == False:
+            ArduinoManager.set_camera(200)
+            
+            
         self.width,self.height_frame = dimensions
         if self.inseguendo_pallina == True:
             self.riconosci_palla_argento(frame)
@@ -178,7 +188,7 @@ class BallsController:
 
         if time.time() - self.timer_obiettivo > 3: #se hai perso la pallina/cassonetto da 3 sec
             print("cercando palline(o cassonetto) . . .")
-            ArduinoManager.send_motor_commands(-25,25)
+            ArduinoManager.send_motor_commands(25,-25)
 
         if time.time() - self.timer_obiettivo > 6: #se da 10 sec,abbassa la telecamera
             ArduinoManager.send_motor_commands(25,25)

@@ -60,13 +60,19 @@ class Seguilinea:
             self.sensor_timer = time.time()
             return
         
-        if self.avoiding_obstacle == False and self.sensor_counter >= 2:
+        '''
+        if self.avoiding_obstacle == False and self.sensor_counter >= 1:
             if(ArduinoManager.handle_obstacle(1) == True):
                 #incomincia schivata ostacolo
                 print("sto schivando ostacolo")
                 self.avoiding_obstacle = True
-
+        
+        if ArduinoManager.motor_state == False:
+            self.avoiding_obstacle = False
+            ArduinoManager.motor_limit = 25
+            
         if self.avoiding_obstacle == True:
+            print("nel loop dell'ostacolo...")
             self.sensor_request_interval = 0.1
             ArduinoManager.pass_obstacle()
             print(self.w)
@@ -83,7 +89,8 @@ class Seguilinea:
                 self.avoiding_obstacle = False
             else:
                 return
-            
+        
+        '''
 
             
         if line_bboxes is not None:
@@ -139,6 +146,8 @@ class Seguilinea:
             #**Nuova logica per le intersezioni**
             # Se non c'è più il verde, controlla se la linea tocca i bordi (intersezioni)
             # - Se x == 0 o x+w coincide con la larghezza del frame, oppure se y == 0
+            
+            '''
             if (x <= 10) or ((x + w) >= self.cam_x-10): #questo quando c'è un indecisione
                 if self.last_green_direction is not None:
                     if self.last_green_direction == "DX":
@@ -159,7 +168,8 @@ class Seguilinea:
                     return
             else:
                 self.last_green_direction = None
-
+            '''
+            
             # Se non sono presenti intersezioni, prova a ricavare due centri della linea per il PID avanzato
             points = self.pid_manager.find_line_centers(
                 binary_mask=self.line_analyzer.binary_mask, 

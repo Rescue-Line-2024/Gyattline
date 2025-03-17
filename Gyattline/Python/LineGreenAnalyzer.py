@@ -15,7 +15,7 @@ class LineGreenAnalyzer:
     """
     def __init__(self, min_area=200):
         self.BLUE = ([100, 150, 0], [140, 255, 255])
-        self.GREEN = ([35, 100, 50], [85, 255, 255])
+        self.GREEN = ([30, 70, 50], [90, 255, 255])
         self.min_area = min_area
         self.color_detector = RiconosciColori(self.GREEN[0], self.GREEN[1], self.min_area)
         self.binary_mask = None
@@ -59,7 +59,7 @@ class LineGreenAnalyzer:
         valid_greens = []
         for green in green_positions:
             x, y, w, h = green["coords"]
-            if (y + h) > cam_y * 0.9:  # Considera solo quelli nella parte inferiore
+            if (y + h) > cam_y * 0.6:  # Considera solo quelli nella parte inferiore
                 valid_greens.append(green)
         if len(valid_greens) == 1:
             self.last_verde = valid_greens[0]["position"]
@@ -69,7 +69,7 @@ class LineGreenAnalyzer:
                 x1,y1,w1,h1 = valid_greens[0]["coords"]
                 x2,y2,w2,h2 = valid_greens[1]["coords"]
                 
-                if (y1+h1 >= cam_y-10 and y2+h2 >= cam_y-10 and (x1 > 5 and x1+w1 < cam_x-5)
+                if ((y1+h1 >= cam_y-20 and y2+h2 >= cam_y-20 )and (x1 > 5 and x1+w1 < cam_x-5)
                 and (x2 > 5 and x2+w2 < cam_x-5)):
                     return "DOPPIO!"
                 else:

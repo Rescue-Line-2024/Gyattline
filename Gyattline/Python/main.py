@@ -21,7 +21,7 @@ class Robot:
         ArduinoManager.motor_state = True
         # Istanza per il riconoscimento del rosso.
         self.riconosci_rosso = RiconosciColori([0, 150, 150], [10, 255, 255], min_area=500)
-
+        self.ag_visto = False
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
@@ -51,15 +51,20 @@ class Robot:
 
                             elif response["action"] == "ARGENTO":
                                 print("ARGENTOOOO!!!")
-                                time.sleep(1)
+                                self.ag_visto = True
+                                
                                 self.raccogliendo_palle = True
-                                ArduinoManager.set_camera(205)
+                                
                                 
 
                             if response["action"] == "Motori_spenti":
                                 print("motori spenti")
                                 ArduinoManager.motor_state = False
                                 self.raccogliendo_palle = False
+                                #zonapalle.andato_avanti = False
+                                ArduinoManager.motor_limit = 25
+                                ArduinoManager.set_camera(160)
+                                time.sleep(0.1)
 
                     
                     except Exception as e:
@@ -67,6 +72,7 @@ class Robot:
 
                 else:
                     ArduinoManager.motor_state = True
+                    self.ag_visto = False
                 
                 # Invio di comandi all'Arduino se presenti
                 with ArduinoManager.message_lock:
@@ -110,12 +116,13 @@ class Robot:
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
-            motor_limit=25
+            motor_limit=30
         )
         
         try:
             while not self.stop_signal:
                 ret, frame = cam.read()
+                frame = cv2.medianBlur(frame, 5)
                 if not ret:
                     print("Errore nella lettura del frame.")
                     break
@@ -125,11 +132,13 @@ class Robot:
                 # Se si sta riconoscendo l'argento, vengono applicate alcune modifiche
                                 # *** Riconoscimento del ROSSO ***
                 red_boxes = self.riconosci_rosso.riconosci_colore(frame_colori)
-                if red_boxes is not None:
+                if red_boxes is not None and self.raccogliendo_palle == False:
+                    x,y,w,h = red_boxes[0]
                     print("Rilevato rosso: fermo i motori!")
                     # Disegna le bounding box sul frame (colore rosso)
                     self.riconosci_rosso.disegna_bbox(red_boxes, frame, (0, 0, 255))
-                    ArduinoManager.send_motor_commands(0, 0)
+                    if w > 200 and y+h > 200:
+                        ArduinoManager.send_motor_commands(0, 0)
                     # Mostra i frame aggiornati e passa alla prossima iterazione
                     cv2.imshow("Camera principale", frame)
                     cv2.imshow("Rilevamento colori", frame_colori)
@@ -139,15 +148,16 @@ class Robot:
                     continue
                 
 
-
-                    
-
+                if self.ag_visto:
+                    ArduinoManager.send_motor_commands(25,25)
+                    time.sleep(1.4)
+                    self.ag_visto = False
                     
                 if self.raccogliendo_palle:
                     ArduinoManager.motor_limit = 15
                     self.zonapalle.main(frame, (width, height))
                 else:
-                    zoom_factor = 1.3  # Puoi aumentare o diminuire questo valore per modificare lo zoom
+                    zoom_factor = 1.4  # Puoi aumentare o diminuire questo valore per modificare lo zoom
                     h, w, _ = frame.shape
                     new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
 
