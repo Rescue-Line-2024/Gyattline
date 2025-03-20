@@ -53,7 +53,6 @@ class Robot:
                                 print("ARGENTOOOO!!!")
                                 self.ag_visto = True
                                 
-                                self.raccogliendo_palle = True
                                 
                                 
 
@@ -122,7 +121,6 @@ class Robot:
         try:
             while not self.stop_signal:
                 ret, frame = cam.read()
-                frame = cv2.medianBlur(frame, 5)
                 if not ret:
                     print("Errore nella lettura del frame.")
                     break
@@ -149,11 +147,24 @@ class Robot:
                 
 
                 if self.ag_visto:
+                    #questo serve a fare andare avanti DI POCO il robot
                     ArduinoManager.send_motor_commands(25,25)
-                    time.sleep(1.4)
+                    time.sleep(1) 
+                    ArduinoManager.request_sensor_data()
+                    time.sleep(0.1)
+                    ArduinoManager.last_obstacle_position = (
+                        "left" if ArduinoManager.left_sensor < ArduinoManager.right_sensor
+                         else "right") 
+                    
+                    self.raccogliendo_palle = True
+                    
+                    #trattiamo il muro come un ostacolo da schivare, solo che useremo un pid differente
+                    #last_obstacle position lo uso per tenermi traccia di quale sensore uso per distanziarmi dal muro
+                    
+                    
                     self.ag_visto = False
                     
-                if self.raccogliendo_palle:
+                if not self.raccogliendo_palle:
                     ArduinoManager.motor_limit = 15
                     self.zonapalle.main(frame, (width, height))
                 else:
