@@ -50,16 +50,16 @@ void AvviaServoIndietro(int speed, int speed2) {
 }
 
 void AvviaMotori(int DX, int SX, int lim = 100) {
-  int potenzaDX = constrain(DX, -lim, lim)*-1;
-  int potenzaSX = constrain(SX, -lim, lim)*-1;
+  int potenzaDX = constrain(DX, -lim, lim);
+  int potenzaSX = constrain(SX, -lim, lim);
 
   // Avvia i motori anteriori (aggiunge un offset di 10 per compensare eventuali disallineamenti)
-  AvviaServoAvanti(potenzaDX + 10, -potenzaSX + 10);
+  AvviaServoAvanti(-potenzaDX + 10, potenzaSX + 10);
 
   // Avvia i motori posteriori: qui si impone che la velocità sia non negativa
   potenzaDX = constrain(potenzaDX, -lim, lim);
   potenzaSX = constrain(potenzaSX, -lim, lim);
-  AvviaServoIndietro(potenzaDX + 10, -potenzaSX + 10);
+  AvviaServoIndietro(-potenzaDX + 10, potenzaSX + 10);
 }
 
 void stop() {
@@ -164,7 +164,7 @@ impostaservo(10,9); //120 su //20 giu braccio
 // --------------------------
 void loop() {
   // ----- Gestione dei comandi in arrivo via Serial -----
-
+  AvviaMotori(-100,100);
   if (Serial.available() > 0) {
     Message = Serial.readStringUntil('\n');
 

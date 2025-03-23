@@ -164,7 +164,7 @@ class Robot:
                     
                     self.ag_visto = False
                     
-                if not self.raccogliendo_palle:
+                if self.raccogliendo_palle:
                     ArduinoManager.motor_limit = 15
                     self.zonapalle.main(frame, (width, height))
                 else:
