@@ -45,6 +45,8 @@ class RiconosciColori:
 
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
+
+
         ret, threshold = cv2.threshold(blur, 100, 255, cv2.THRESH_BINARY_INV)
 
         RiconosciColori.thresh = threshold

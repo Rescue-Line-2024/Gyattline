@@ -105,7 +105,7 @@ class Robot:
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("Risoluzione corrente:", width, height)
         
-        pid_params = (1, 0, 0)
+        pid_params = (1.5, 0, 0)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,

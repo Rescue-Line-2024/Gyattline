@@ -60,7 +60,7 @@ class Seguilinea:
             self.sensor_timer = time.time()
             return
         
-        '''
+        
         if self.avoiding_obstacle == False and self.sensor_counter >= 1:
             if(ArduinoManager.handle_obstacle(1) == True):
                 #incomincia schivata ostacolo
@@ -90,7 +90,7 @@ class Seguilinea:
             else:
                 return
         
-        '''
+        
 
             
         if line_bboxes is not None:
@@ -123,6 +123,7 @@ class Seguilinea:
                     logging.info("Marker verde: gira a destra")
                     self.last_green_direction = "DX"
                     deviation = self.pid_manager.compute_deviation_h((x+w) , h, self.cut_y,is_line_centered)
+                    cv2.circle(frame, (x+w, self.cut_y), 10, (255, 255, 0), -1)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
@@ -130,6 +131,7 @@ class Seguilinea:
                     logging.info("Marker verde: gira a sinistra")
                     self.last_green_direction = "SX"
                     deviation = self.pid_manager.compute_deviation_h(x, h, self.cut_y,is_line_centered)
+                    cv2.circle(frame, (x, self.cut_y), 10, (255, 255, 0), -1)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
                     return
