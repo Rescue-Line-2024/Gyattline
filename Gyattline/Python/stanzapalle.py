@@ -171,6 +171,10 @@ class BallsController:
                 ArduinoManager.request_sensor_data()
                 print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
                 self.sensor_timer = time.time()
+            
+            if ArduinoManager.front_sensor is not None and ArduinoManager.front_sensor < 12:
+                self.turn()
+                print("girando(anche i coglioni girano)")
 
             # Gestione della scansione non bloccante
             if not self.scanning_active and (current_time - self.last_scan_time > self.scan_interval):

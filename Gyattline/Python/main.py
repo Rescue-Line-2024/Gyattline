@@ -21,7 +21,7 @@ class Robot:
         ArduinoManager.motor_state = True
         # Istanza per il riconoscimento del rosso.
         self.riconosci_rosso = RiconosciColori([0, 150, 150], [10, 255, 255], min_area=500)
-        self.ag_visto = False
+        self.ag_visto = True
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
@@ -61,7 +61,7 @@ class Robot:
                                 ArduinoManager.motor_state = False
                                 self.raccogliendo_palle = False
                                 #zonapalle.andato_avanti = False
-                                ArduinoManager.motor_limit = 25
+                                ArduinoManager.motor_limit = 30
                                 ArduinoManager.set_camera(160)
                                 time.sleep(0.1)
 
@@ -149,20 +149,34 @@ class Robot:
                 if self.ag_visto:
                     #questo serve a fare andare avanti DI POCO il robot
                     ArduinoManager.send_motor_commands(25,25)
+                    print("argento! andando avanti")
                     time.sleep(1) 
                     ArduinoManager.request_sensor_data()
                     time.sleep(0.1)
-                    ArduinoManager.last_obstacle_position = (
-                        "left" if ArduinoManager.left_sensor < ArduinoManager.right_sensor
-                         else "right") 
-                    
+
+
                     self.raccogliendo_palle = True
                     
                     #trattiamo il muro come un ostacolo da schivare, solo che useremo un pid differente
                     #last_obstacle position lo uso per tenermi traccia di quale sensore uso per distanziarmi dal muro
                     
                     
+                    if ArduinoManager.left_sensor is not None and ArduinoManager.right_sensor is not None:
+                        ArduinoManager.last_obstacle_position = (
+                            "left" if ArduinoManager.left_sensor < ArduinoManager.right_sensor
+                            else "right") 
+                    else:
+                        if ArduinoManager.left_sensor is not None:
+                            ArduinoManager.last_obstacle_position = "left"
+                        if ArduinoManager.right_sensor is not None:
+                            ArduinoManager.last_obstacle_position = "right"
+                        else:
+                            print("i sensori non funzionano,impossibile prendere le palle.")
+                            self.raccogliendo_palle = False
+                    
                     self.ag_visto = False
+                    
+
                     
                 if self.raccogliendo_palle:
                     ArduinoManager.motor_limit = 15
