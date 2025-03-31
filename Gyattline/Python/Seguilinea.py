@@ -61,7 +61,7 @@ class Seguilinea:
             return
         
         
-        if self.avoiding_obstacle == False and self.sensor_counter >= 1:
+        if self.avoiding_obstacle == False and self.sensor_counter >= 3:
             if(ArduinoManager.handle_obstacle(1) == True):
                 #incomincia schivata ostacolo
                 print("sto schivando ostacolo")
@@ -69,7 +69,7 @@ class Seguilinea:
         
         if ArduinoManager.motor_state == False:
             self.avoiding_obstacle = False
-            ArduinoManager.motor_limit = 25
+            ArduinoManager.motor_limit = 30
             
         if self.avoiding_obstacle == True:
             print("nel loop dell'ostacolo...")
@@ -78,7 +78,7 @@ class Seguilinea:
             print(self.w)
             if self.w > 200:
                 print("ostacolo schivato!")
-                ArduinoManager.motor_limit = 25
+                ArduinoManager.motor_limit = 30
                 if ArduinoManager.last_obstacle_position == "right":
                     ArduinoManager.send_motor_commands(-25,25)
                 else:

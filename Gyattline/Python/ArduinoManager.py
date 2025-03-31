@@ -146,7 +146,7 @@ class ArduinoManager:
     def set_camera(cls,grad):
         cls.camera_grad = grad
         with cls.message_lock:
-            print("modificando posizione telecamera")
+            print("modificando posizione telecamera dentro la f set camera")
             cls.message = {"action" : "set_camera" , "data" : int(grad)}
 
     @classmethod

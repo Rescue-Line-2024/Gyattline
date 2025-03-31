@@ -51,6 +51,7 @@ class Robot:
 
                             elif response["action"] == "ARGENTO":
                                 print("ARGENTOOOO!!!")
+                                
                                 self.ag_visto = True
                                 
                                 
@@ -77,6 +78,7 @@ class Robot:
                 with ArduinoManager.message_lock:
                     if ArduinoManager.message is not None:
                         conn.send_message(ArduinoManager.message)
+                        print(ArduinoManager.message)
                         time.sleep(0.05)  # Piccola pausa per evitare di sovraccaricare la CPU
                         ArduinoManager.message = None
                         
@@ -105,7 +107,7 @@ class Robot:
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("Risoluzione corrente:", width, height)
         
-        pid_params = (1.5, 0, 0)
+        pid_params = (1, 0, 0)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
@@ -114,7 +116,7 @@ class Robot:
             pen_multiplier=0.1,
             cam_resolution=(width, height),
             min_area=50,
-            cut_percentage=0.6,
+            cut_percentage=0.5,
             motor_limit=30
         )
         
@@ -130,7 +132,7 @@ class Robot:
                 # Se si sta riconoscendo l'argento, vengono applicate alcune modifiche
                                 # *** Riconoscimento del ROSSO ***
                 red_boxes = self.riconosci_rosso.riconosci_colore(frame_colori)
-                if red_boxes is not None and self.raccogliendo_palle == False:
+                if red_boxes is not None and self.raccogliendo_palle == False and False:
                     x,y,w,h = red_boxes[0]
                     print("Rilevato rosso: fermo i motori!")
                     # Disegna le bounding box sul frame (colore rosso)
@@ -141,7 +143,7 @@ class Robot:
                     cv2.imshow("Camera principale", frame)
                     cv2.imshow("Rilevamento colori", frame_colori)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
-                        Seguilinea.messaggio = {"action": "stop"}
+                        ArduinoManager.message = {"action": "stop"}
                         self.stop_signal = True
                     continue
                 
@@ -149,10 +151,13 @@ class Robot:
                 if self.ag_visto:
                     #questo serve a fare andare avanti DI POCO il robot
                     ArduinoManager.send_motor_commands(25,25)
+                    
                     print("argento! andando avanti")
                     time.sleep(1) 
-                    ArduinoManager.request_sensor_data()
-                    time.sleep(0.1)
+                    for i in range (10):
+                        ArduinoManager.request_sensor_data()
+                        print(ArduinoManager.front_sensor,ArduinoManager.left_sensor,ArduinoManager.right_sensor)
+                        time.sleep(0.1)
 
 
                     self.raccogliendo_palle = True
@@ -173,7 +178,12 @@ class Robot:
                         else:
                             print("i sensori non funzionano,impossibile prendere le palle.")
                             self.raccogliendo_palle = False
-                    
+
+                    if ArduinoManager.last_obstacle_position == "left":
+                        self.zonapalle.wall_pid.inverted *= -1
+
+                    ArduinoManager.set_camera(190)
+                    time.sleep(0.1)
                     self.ag_visto = False
                     
 

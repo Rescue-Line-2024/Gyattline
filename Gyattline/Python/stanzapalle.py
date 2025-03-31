@@ -22,7 +22,7 @@ class BallsController:
         self.model = YOLO(self.model_path)
         # PID per la correzione durante la raccolta o il deposito
         self.pid = gpPID(P=1.4, I=0, D=0, setpoint=self.width / 2)
-        self.wall_pid = gpPID(P=12, I=0, D=0, setpoint=12)
+        self.wall_pid = gpPID(P=12, I=0, D=0, setpoint=20)
 
         self.sensor_request_interval = 0.2
         
@@ -31,7 +31,7 @@ class BallsController:
         # Tempo dell'ultima scansione per eseguire una rotazione
         self.last_scan_time = time.time()
         # Intervallo di tempo (in secondi) fra una scansione e l'altra
-        self.scan_interval = 5  
+        self.scan_interval = 8  
         # Durata della rotazione di scansione
 
         self.scan_duration = 6 
@@ -57,7 +57,7 @@ class BallsController:
             for box in result.boxes:
                 cls = int(box.cls[0])
                 conf = float(box.conf[0])
-                if conf > 0.7 and (cls == 1 or cls == 0):
+                if conf > 0.75 and (cls == 1 or cls == 0):
                     x1, y1, x2, y2 = box.xyxy[0]
                     center_x = (x1 + x2) / 2.0
                     # Calcola la correzione PID in base alla posizione
@@ -132,6 +132,9 @@ class BallsController:
         ArduinoManager.send_message("pinza", "apri_braccia")
         print("Alzo braccia")
         time.sleep(1)
+        ArduinoManager.send_motor_commands(-20,-20)
+        print("Alzo braccia")
+        time.sleep(3)
 
     def deposita_pallina(self):
         """
@@ -164,74 +167,90 @@ class BallsController:
 
 
     def main(self, frame, dimensions):
-            self.width, self.height_frame = dimensions
-            current_time = time.time()
+        self.width, self.height_frame = dimensions
+        current_time = time.time()
+        
+        # Inizializza una stringa che indichi l'attività attuale
+        activity = "Idle"
 
-            if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
-                ArduinoManager.request_sensor_data()
-                print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
-                self.sensor_timer = time.time()
-            
-            if ArduinoManager.front_sensor is not None and ArduinoManager.front_sensor < 12:
-                self.turn()
-                print("girando(anche i coglioni girano)")
-
-            # Gestione della scansione non bloccante
-            if not self.scanning_active and (current_time - self.last_scan_time > self.scan_interval):
-                self.scanning_active = True
-                self.scan_start_time = current_time
-
-            #fai lo scan,ma se hai trovato o pallina o cassonetto non ne hai motivo di farlo
-            if self.scanning_active and not self.ball_found and not self.bin_found:
-
-                if current_time - self.scan_start_time < 3:
-                    print("allontanandomi dal muro")
-                    self.scan(1) #mi allontano dal muro
-                else:
-                    print("riavvicinandomi")
-                    self.scan(-1) #inverto direzione e torno verso il muro
-                    
-                # Se la durata di scansione è terminata, ferma la rotazione
-                if current_time - self.scan_start_time >= self.scan_duration:
-                    self.scanning_active = False
-                    self.last_scan_time = current_time
-
-            if self.inseguendo_pallina:
-                self.bin_found = False
-                self.ball_found = self.riconosci_palla_argento(frame)
-                if self.ball_found:
-                    pass #bho ci pensa la funzione ad inseguire la pallina e prenderla
-                elif not self.scanning_active: # se non sto scannerizzando, pid col muro
-                    print("pid muro")
-                    if (ArduinoManager.left_sensor is not None and ArduinoManager.right_sensor is not None):
-
-                        value =( 
-                         ArduinoManager.left_sensor if ArduinoManager.last_obstacle_position == "left"
-                         else ArduinoManager.right_sensor)
-                        
-                        correction = self.wall_pid.calcolopid(value)
-                        right_motor,left_motor = self.wall_pid.calcolapotenzamotori(correction)
-                        print(f"PID MURO value = {value} MOTORI : DX-{right_motor} SX-{left_motor}")
-                        ArduinoManager.send_motor_commands(right_motor, left_motor)
-                    else:
-                        ArduinoManager.send_motor_commands(20, 20)
-            else:
-                self.ball_found = False
-                self.bin_found = self.insegui_cassonetto_verde(frame)
-                if self.bin_found:
-                    pass # ci pensa la funzione sopra ad inseguire il cassonetto e depositare pallina
-                elif not self.scanning_active: #se non sto scannerizzando, pid col muro
-                    print("pid muro")
-                    if (ArduinoManager.left_sensor is not None and ArduinoManager.right_sensor is not None):
-                        value =( 
-                         ArduinoManager.left_sensor if ArduinoManager.last_obstacle_position == "left"
-                         else ArduinoManager.right_sensor)
-                                                
-                        correction = self.wall_pid.calcolopid(value)
-                        right_motor,left_motor = self.wall_pid.calcolapotenzamotori(correction)
-                        print(f"PID MURO value = {value} MOTORI : DX-{right_motor} SX-{left_motor}")
-                        ArduinoManager.send_motor_commands(right_motor, left_motor)
-                    else:
-                        ArduinoManager.send_motor_commands(20, 20)
-
+        if time.time() - self.sensor_timer > self.sensor_request_interval:  # ogni tanto richiedi i sensori
+            ArduinoManager.request_sensor_data()
+            print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
             time.sleep(0.1)
+            self.sensor_timer = time.time()
+        
+        if ArduinoManager.front_sensor is not None and ArduinoManager.front_sensor < 12 and self.bin_found == False:
+            self.turn()
+            activity = "Turn (ostacolo davanti)"
+            print("girando(anche i coglioni girano)")
+        
+        # Gestione della scansione non bloccante
+        if not self.scanning_active and (current_time - self.last_scan_time > self.scan_interval):
+            self.scanning_active = True
+            self.scan_start_time = current_time
+
+        # Se eseguo la scansione e non ho trovato né pallina né cassonetto
+        if self.scanning_active and not self.ball_found and not self.bin_found:
+            if current_time - self.scan_start_time < 3:
+                activity = "Scanning: allontanandomi dal muro"
+                print("allontanandomi dal muro")
+                self.scan(1)  # mi allontano dal muro
+            else:
+                activity = "Scanning: riavvicinandomi"
+                print("riavvicinandomi")
+                self.scan(-1)  # inverto direzione e torno verso il muro
+
+            # Se la durata di scansione è terminata, ferma la rotazione
+            if current_time - self.scan_start_time >= self.scan_duration:
+                self.scanning_active = False
+                self.last_scan_time = current_time
+
+        # Se il robot sta inseguendo la pallina
+        if self.inseguendo_pallina:
+            self.bin_found = False
+            self.ball_found = self.riconosci_palla_argento(frame)
+            if self.ball_found:
+                activity = "Inseguo/Pallina trovata"
+                # La funzione 'riconosci_palla_argento' gestisce già l'inseguimento e la presa
+            elif not self.scanning_active:  # se non sto scannerizzando, utilizzo PID col muro
+                activity = "PID col muro (inseguimento pallina)"
+                print("pid muro")
+                if (ArduinoManager.left_sensor is not None and ArduinoManager.right_sensor is not None):
+                    value = (ArduinoManager.left_sensor if ArduinoManager.last_obstacle_position == "left"
+                            else ArduinoManager.right_sensor)
+                    correction = self.wall_pid.calcolopid(value)
+                    right_motor, left_motor = self.wall_pid.calcolapotenzamotori(correction)
+                    motor_limit = ArduinoManager.motor_limit
+                    right_motor = max(min(right_motor, motor_limit), 0)
+                    left_motor = max(min(left_motor, motor_limit), 0)
+                    print(f"PID MURO value = {value} MOTORI : DX-{right_motor} SX-{left_motor}")
+                    ArduinoManager.send_motor_commands(right_motor, left_motor)
+                else:
+                    ArduinoManager.send_motor_commands(20, 20)
+        else:
+            self.ball_found = False
+            self.bin_found = self.insegui_cassonetto_verde(frame)
+            if self.bin_found:
+                activity = "Deposito pallina (cassonetto trovato)"
+                # La funzione 'insegui_cassonetto_verde' gestisce l'inseguimento e il deposito
+            elif not self.scanning_active:  # se non sto scannerizzando, utilizzo PID col muro
+                activity = "PID col muro (deposito)"
+                print("pid muro")
+                if (ArduinoManager.left_sensor is not None and ArduinoManager.right_sensor is not None):
+                    value = (ArduinoManager.left_sensor if ArduinoManager.last_obstacle_position == "left"
+                            else ArduinoManager.right_sensor)
+                    correction = self.wall_pid.calcolopid(value)
+                    right_motor, left_motor = self.wall_pid.calcolapotenzamotori(correction)
+                    motor_limit = ArduinoManager.motor_limit
+                    right_motor = max(min(right_motor, motor_limit), 0)
+                    left_motor = max(min(left_motor, motor_limit), 0)
+                    print(f"PID MURO value = {value} MOTORI : DX-{right_motor} SX-{left_motor}")
+                    ArduinoManager.send_motor_commands(right_motor, left_motor)
+                else:
+                    ArduinoManager.send_motor_commands(20, 20)
+
+        # Aggiunge un delay di 0.1 secondi
+        time.sleep(0.1)
+
+        # Scrive l'attività sul frame
+        cv2.putText(frame, activity, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
