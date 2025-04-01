@@ -206,13 +206,6 @@ void loop() {
 
   
 
-    if(digitalRead(12)){
-      StaticJsonDocument<200> response;
-      response["action"] = "ARGENTO";
-      serializeJson(response,Serial);
-      Serial.println();
-    }
-
     if(Action == "set_servo"){
       impostaservo(200,6); //telecamera 200 quasi tutta su 160 giu
     }

@@ -4,8 +4,30 @@ from ric_colori import RiconosciColori
 from Seguilinea import Seguilinea
 from ArduinoManager import ArduinoManager
 from stanzapalle import BallsController
+from ultralytics import YOLO
 import cv2
 import time
+import multiprocessing
+import numpy as np
+
+# Funzione globale per il riconoscimento dell'argento
+def riconosci_argento_process(frame_queue, argento_queue):
+    # Carica il modello YOLO all'interno del processo
+    model = YOLO("my_model.pt")
+    while True:
+        if not frame_queue.empty():
+            frame = frame_queue.get()
+            punti = []  # Valore di default nel caso non vengano trovate box
+            results = model(frame)
+            for res in results:
+                for box in res.boxes:
+                    punti = box.xywh[0]
+                    print("Punti trovati:", punti)
+            try:
+                argento_queue.put(punti.numpy())
+            except Exception as e:
+                argento_queue.put(punti)
+
 class Robot:
     def __init__(self):
         self.stop_signal = False  # Segnale per terminare i thread
@@ -14,6 +36,14 @@ class Robot:
         # Inizializza i thread
         self.serial_thread = Thread(target=self.serial_communication)
         self.camera_thread = Thread(target=self.camera_main)
+                # Code per il riconoscimento dell'argento (YOLO)
+        self.frame_queue_argento = multiprocessing.Queue(maxsize=5)
+        self.argento_queue = multiprocessing.Queue(maxsize=5)
+        self.argento_process = multiprocessing.Process(
+            target=riconosci_argento_process,
+            args=(self.frame_queue_argento, self.argento_queue)
+        )
+        
 
         self.zonapalle = BallsController()
         self.raccogliendo_palle = False
@@ -21,10 +51,11 @@ class Robot:
         ArduinoManager.motor_state = True
         # Istanza per il riconoscimento del rosso.
         self.riconosci_rosso = RiconosciColori([0, 150, 150], [10, 255, 255], min_area=500)
-        self.ag_visto = True
+        self.ag_visto = False
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
+        self.argento_process.start()
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
@@ -49,10 +80,6 @@ class Robot:
                                 print("Ricevuto comando di stop dall'Arduino")
                                 self.stop_signal = True
 
-                            elif response["action"] == "ARGENTO":
-                                print("ARGENTOOOO!!!")
-                                
-                                self.ag_visto = True
                                 
                                 
                                 
@@ -132,7 +159,7 @@ class Robot:
                 # Se si sta riconoscendo l'argento, vengono applicate alcune modifiche
                                 # *** Riconoscimento del ROSSO ***
                 red_boxes = self.riconosci_rosso.riconosci_colore(frame_colori)
-                if red_boxes is not None and self.raccogliendo_palle == False and False:
+                if red_boxes is not None and self.raccogliendo_palle == False:
                     x,y,w,h = red_boxes[0]
                     print("Rilevato rosso: fermo i motori!")
                     # Disegna le bounding box sul frame (colore rosso)
@@ -146,9 +173,35 @@ class Robot:
                         ArduinoManager.message = {"action": "stop"}
                         self.stop_signal = True
                     continue
-                
+                       
+                         # Invia il frame al processo del riconoscimento dell'argento
+                if not self.frame_queue_argento.full():
+                    # Se necessario, invia una copia o una versione ridimensionata
+                    if self.raccogliendo_palle == False and ArduinoManager.motor_state == True:
+                        self.frame_queue_argento.put(frame.copy())
 
-                if self.ag_visto:
+                # Gestione del risultato di YOLO (riconoscimento dell'argento)
+                if not self.argento_queue.empty():
+                    argento_trovato = self.argento_queue.get()
+                    print("Risultato argento:", argento_trovato)
+                    if isinstance(argento_trovato, (list, np.ndarray)) and len(argento_trovato) == 4:
+                        x, y, w, h = map(int, argento_trovato)
+                        # Esempio: se l'argento è nella metà inferiore dell'immagine
+                        if y > height / 2:
+                            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                            print("ARGENTO TROVATO!!")
+                            self.ag_visto = True
+                            self.raccogliendo_palle = True
+                        else:
+                            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                            print("ARGENTO NON TROVATO ma c'è!!")
+                            self.ag_visto = False
+                    else:
+                        print("ARGENTO NON TROVATO!!")
+                        self.ag_visto = False
+
+
+                if self.ag_visto and self.raccogliendo_palle == False:
                     #questo serve a fare andare avanti DI POCO il robot
                     ArduinoManager.send_motor_commands(25,25)
                     
@@ -228,12 +281,14 @@ class Robot:
             cam.release()
             cv2.destroyAllWindows()
 
+
     def join_threads(self):
         """
         Attende che i thread terminino.
         """
         self.serial_thread.join()
         self.camera_thread.join()
+        self.argento_process.join()
 
 if __name__ == "__main__":
     robot = Robot()
