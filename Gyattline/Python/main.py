@@ -5,6 +5,10 @@ from Seguilinea import Seguilinea
 from ArduinoManager import ArduinoManager
 from stanzapalle import BallsController
 from ultralytics import YOLO
+import logging
+
+logging.getLogger("ultralytics").setLevel(logging.ERROR)
+
 import cv2
 import time
 import multiprocessing
@@ -16,13 +20,16 @@ def riconosci_argento_process(frame_queue, argento_queue):
     model = YOLO("my_model.pt")
     while True:
         if not frame_queue.empty():
+            #print("riconoscendo argento ...")
             frame = frame_queue.get()
             punti = []  # Valore di default nel caso non vengano trovate box
             results = model(frame)
             for res in results:
                 for box in res.boxes:
-                    punti = box.xywh[0]
-                    print("Punti trovati:", punti)
+                    conf = float(box.conf[0])
+                    if conf > 0.75:
+                        punti = box.xywh[0]
+                        print("Punti trovati:", punti)
             try:
                 argento_queue.put(punti.numpy())
             except Exception as e:
@@ -45,6 +52,7 @@ class Robot:
         )
         
 
+        self.ag_timer = time.time()-5
         self.zonapalle = BallsController()
         self.raccogliendo_palle = False
         self.riconoscendo_argento = False
@@ -86,6 +94,7 @@ class Robot:
 
                             if response["action"] == "Motori_spenti":
                                 print("motori spenti")
+                                self.ag_timer = time.time()
                                 ArduinoManager.motor_state = False
                                 self.raccogliendo_palle = False
                                 #zonapalle.andato_avanti = False
@@ -134,7 +143,7 @@ class Robot:
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("Risoluzione corrente:", width, height)
         
-        pid_params = (1, 0, 0)
+        pid_params = (2, 0, 0) # (Kp, Ki, Kd)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
@@ -166,13 +175,16 @@ class Robot:
                     self.riconosci_rosso.disegna_bbox(red_boxes, frame, (0, 0, 255))
                     if w > 200 and y+h > 200:
                         ArduinoManager.send_motor_commands(0, 0)
-                    # Mostra i frame aggiornati e passa alla prossima iterazione
+                        continue
+                        #ROSSO VISTO!!! STAI FERMOOOOO!!!
+
+                    
                     cv2.imshow("Camera principale", frame)
                     cv2.imshow("Rilevamento colori", frame_colori)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         ArduinoManager.message = {"action": "stop"}
                         self.stop_signal = True
-                    continue
+                    
                        
                          # Invia il frame al processo del riconoscimento dell'argento
                 if not self.frame_queue_argento.full():
@@ -189,14 +201,18 @@ class Robot:
                         # Esempio: se l'argento è nella metà inferiore dell'immagine
                         if y > height / 2:
                             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                            print("ARGENTO TROVATO!!")
-                            self.ag_visto = True
-                            self.raccogliendo_palle = True
+                            print("ARGENTO TROVATO!! attendi un po")
+                            if self.ag_timer < time.time()-0.5:
+                                self.ag_visto = True
+                                self.raccogliendo_palle = True
+                                print("ARGENTOOOO!!!")
                         else:
+                            self.ag_timer = time.time()
                             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
                             print("ARGENTO NON TROVATO ma c'è!!")
                             self.ag_visto = False
                     else:
+                        self.ag_timer = time.time()
                         print("ARGENTO NON TROVATO!!")
                         self.ag_visto = False
 
@@ -226,7 +242,7 @@ class Robot:
                     else:
                         if ArduinoManager.left_sensor is not None:
                             ArduinoManager.last_obstacle_position = "left"
-                        if ArduinoManager.right_sensor is not None:
+                        elif ArduinoManager.right_sensor is not None:
                             ArduinoManager.last_obstacle_position = "right"
                         else:
                             print("i sensori non funzionano,impossibile prendere le palle.")
@@ -292,4 +308,4 @@ class Robot:
 
 if __name__ == "__main__":
     robot = Robot()
-    # robot.join_threads()  # Puoi chiamare join_threads() se desideri attendere la terminazione dei thread
+    #robot.join_threads()  # Puoi chiamare join_threads() se desideri attendere la terminazione dei thread

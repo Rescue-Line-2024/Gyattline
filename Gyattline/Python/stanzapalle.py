@@ -12,7 +12,7 @@ class BallsController:
         self.sensor_timer = time.time()
 
         current_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        model_dir =  os.path.join(current_dir, "my_model.pt")
+        model_dir =  os.path.join(current_dir, "ball_model.pt")
         self.model_path = model_dir
         print(self.model_path)
 
@@ -69,12 +69,20 @@ class BallsController:
                     cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     # Se la pallina è "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
-                    if y2 > 220:
-                        print("Pallina vicina: la prendo!")
-                        # Esegue la procedura per prendere la pallina
-                        self.prendi_pallina()
-                        self.inseguendo_pallina = False
-                        return True
+                    if y2 > 210:
+                        if abs(correzione) < 20:
+                            print("Pallina vicina: la prendo!")
+                            # Esegue la procedura per prendere la pallina
+                            self.prendi_pallina()
+                            self.inseguendo_pallina = False
+                            return True
+                        else:
+                            DX, SX = self.pid.calcolapotenzamotori(correzione*100) #cosi va o a destra o a sinistra,senza vie di mezzo
+                            print(f"PALLA VICINA,CORREGGENDO ; MOTORI : DX-{DX} SX-{SX}")
+                            ArduinoManager.send_motor_commands(DX, SX)
+                            return True
+
+                            
                     else:
                         # Regola i motori per inseguire la pallina
                         DX, SX = self.pid.calcolapotenzamotori(correzione)
