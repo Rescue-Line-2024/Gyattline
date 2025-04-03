@@ -35,6 +35,21 @@ def riconosci_argento_process(frame_queue, argento_queue):
             except Exception as e:
                 argento_queue.put(punti)
 
+def zonapalle_process_func(frame_queue, pause_event, resolution, lock):
+    balls = BallsController()
+    while True:
+        if pause_event.is_set():
+            if not frame_queue.empty():
+                with lock:  # Blocca l'accesso finché il frame attuale non è stato elaborato
+                    frame = frame_queue.get()
+                    balls.main(frame, resolution)
+                    cv2.imshow("Palle", frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+        else:
+            time.sleep(0.1)
+
+
 class Robot:
     def __init__(self):
         self.stop_signal = False  # Segnale per terminare i thread
@@ -50,6 +65,16 @@ class Robot:
             target=riconosci_argento_process,
             args=(self.frame_queue_argento, self.argento_queue)
         )
+
+        self.zonapalle_frame_queue = multiprocessing.Queue(maxsize=1)
+        self.zonapalle_pause_event = multiprocessing.Event()
+        self.zonapalle_lock = multiprocessing.Lock()
+        self.zonapalle_process = multiprocessing.Process(
+            target=zonapalle_process_func,
+            args=(self.zonapalle_frame_queue, self.zonapalle_pause_event, (320, 240),self.zonapalle_lock)
+        )
+
+        
         
 
         self.ag_timer = time.time()-5
@@ -64,6 +89,7 @@ class Robot:
         self.serial_thread.start()
         self.camera_thread.start()
         self.argento_process.start()
+        self.zonapalle_process.start()
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
@@ -155,7 +181,10 @@ class Robot:
             cut_percentage=0.5,
             motor_limit=30
         )
-        
+                # Inizializza il processo per zonapalle dopo aver ottenuto la risoluzione
+
+
+
         try:
             while not self.stop_signal:
                 ret, frame = cam.read()
@@ -185,6 +214,13 @@ class Robot:
                         ArduinoManager.message = {"action": "stop"}
                         self.stop_signal = True
                     
+
+
+                if self.raccogliendo_palle:
+                    with self.zonapalle_lock:  # Blocca l'inserimento finché il processo non libera il lock
+                        if not self.zonapalle_frame_queue.full():
+                            self.zonapalle_frame_queue.put(frame)
+                        
                        
                          # Invia il frame al processo del riconoscimento dell'argento
                 if not self.frame_queue_argento.full():
@@ -258,9 +294,13 @@ class Robot:
 
                     
                 if self.raccogliendo_palle:
+                    # Attiva il processo zonapalle
                     ArduinoManager.motor_limit = 15
-                    self.zonapalle.main(frame, (width, height))
+                    self.zonapalle_pause_event.set()
+                    if not self.zonapalle_frame_queue.full():
+                        self.zonapalle_frame_queue.put(frame)
                 else:
+                    self.zonapalle_pause_event.clear()
                     zoom_factor = 1.4  # Puoi aumentare o diminuire questo valore per modificare lo zoom
                     h, w, _ = frame.shape
                     new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
@@ -307,5 +347,6 @@ class Robot:
         self.argento_process.join()
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     robot = Robot()
-    #robot.join_threads()  # Puoi chiamare join_threads() se desideri attendere la terminazione dei thread
+    #robot.join_threads()  # Puoi chiamare join_threads() se desideri attendere la terminazione dei thread 
