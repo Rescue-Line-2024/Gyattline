@@ -122,7 +122,7 @@ class Seguilinea:
                 if green_decision == "DX":
                     logging.info("Marker verde: gira a destra")
                     self.last_green_direction = "DX"
-                    deviation = self.pid_manager.compute_deviation_h((x+w) , h, self.cut_y,is_line_centered)//2
+                    deviation = self.pid_manager.compute_deviation_h((x+w) , h, self.cut_y,is_line_centered)
                     cv2.circle(frame, (x+w, self.cut_y), 10, (255, 255, 0), -1)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
@@ -130,7 +130,7 @@ class Seguilinea:
                 elif green_decision == "SX":
                     logging.info("Marker verde: gira a sinistra")
                     self.last_green_direction = "SX"
-                    deviation = self.pid_manager.compute_deviation_h(x, h, self.cut_y,is_line_centered)//2
+                    deviation = self.pid_manager.compute_deviation_h(x, h, self.cut_y,is_line_centered)
                     cv2.circle(frame, (x, self.cut_y), 10, (255, 255, 0), -1)
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
