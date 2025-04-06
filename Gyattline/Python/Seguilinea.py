@@ -50,7 +50,7 @@ class Seguilinea:
         
         if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
             ArduinoManager.request_sensor_data()
-            print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
+            #print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
             if ArduinoManager.front_sensor is not None:
                 if ArduinoManager.front_sensor < 15:
                     self.sensor_counter +=1
@@ -200,7 +200,7 @@ class Seguilinea:
                 center_line_y = (y_original + y_original + h) // 2
                 cv2.circle(frame, (center_line_x, center_line_y), 5, (255, 0, 0), -1)
                 deviation = self.pid_manager.compute_deviation_h(center_line_x, h, self.cut_y,is_line_centered)
-                print("deviazione: ",deviation,"centro:",center_line_x)
+                #print("deviazione: ",deviation,"centro:",center_line_x)
             motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
             ArduinoManager.send_motor_commands(motor_dx, motor_sx)
             

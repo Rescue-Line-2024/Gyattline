@@ -12,7 +12,7 @@ class BallsController:
         self.sensor_timer = time.time()
 
         current_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        model_dir =  os.path.join(current_dir, "my_model.pt")
+        model_dir =  os.path.join(current_dir, "ball_model.pt")
         self.model_path = model_dir
         print(self.model_path)
 
