@@ -164,7 +164,7 @@ impostaservo(10,9); //120 su //20 giu braccio
 // --------------------------
 void loop() {
   // ----- Gestione dei comandi in arrivo via Serial -----
-  AvviaMotori(-100,100);
+  //AvviaMotori(-100,100);
   if (Serial.available() > 0) {
     Message = Serial.readStringUntil('\n');
 
@@ -206,16 +206,11 @@ void loop() {
 
   
 
-    if(digitalRead(12)){
-      StaticJsonDocument<200> response;
-      response["action"] = "ARGENTO";
-      serializeJson(response,Serial);
-      Serial.println();
-    }
 
-    if(Action == "set_servo"){
-      impostaservo(200,6); //telecamera 200 quasi tutta su 160 giu
-    }
+  if (Action == "set_camera") {
+      int angle = doc["data"];
+      impostaservo(angle, 6); // Usa il valore inviato per modificare la telecamera
+  }
 
     if(Action == "pinza"){
       if (doc["data"] == "apri_mani")

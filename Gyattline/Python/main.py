@@ -53,11 +53,12 @@ class Robot:
         self.zonapalle = BallsController()
         self.raccogliendo_palle = False
         self.riconoscendo_argento = False
+        self.on_serial = True
         ArduinoManager.motor_state = False
         self.ag_timer = time.time()-5
 
-        self.frame_queue_argento = multiprocessing.Queue(maxsize=5)
-        self.argento_queue = multiprocessing.Queue(maxsize=5)
+        self.frame_queue_argento = multiprocessing.Queue(maxsize=1)
+        self.argento_queue = multiprocessing.Queue(maxsize=1)
         self.argento_process = multiprocessing.Process(
             target=riconosci_argento_process,
             args=(self.frame_queue_argento, self.argento_queue)
@@ -125,6 +126,8 @@ class Robot:
                         
         except Exception as e:
             print("Errore nella comunicazione seriale:", e)
+            ArduinoManager.motor_state = True
+            self.on_serial = False
         finally:
             ArduinoManager.send_motor_commands(0, 0)
             conn.close_connection()
@@ -179,12 +182,11 @@ class Robot:
 
                 
                  #Gestione del risultato di YOLO (riconoscimento dell'argento)
-                if not self.argento_queue.empty():
+                if not self.argento_queue.empty() and self.raccogliendo_palle == False:
                     argento_trovato = self.argento_queue.get()
                     print("Risultato argento:", argento_trovato)
                     if argento_trovato > 0.5:
                         self.ag_visto = True
-                        self.raccogliendo_palle = True
                         print("ARGENTOOOO!!!")
 
                     else:
@@ -229,6 +231,9 @@ class Robot:
                     ArduinoManager.set_camera(190)
                     time.sleep(1)
                     self.ag_visto = False
+                    if self.on_serial == False: #testing mode
+                        self.raccogliendo_palle = True
+
                     
 
                     
@@ -248,11 +253,6 @@ class Robot:
                     # Ritaglio e ridimensionamento
                     frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
                     frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
-
-                    if not self.frame_queue_argento.full():
-                        # Se necessario, invia una copia o una versione ridimensionata
-                        if ArduinoManager.motor_state == True:
-                            self.frame_queue_argento.put(frame.copy())
 
                             
                     red_boxes = self.riconosci_rosso.riconosci_colore(frame)
@@ -274,6 +274,12 @@ class Robot:
                     Line_follower.follow_line(frame)
 
                 # Mostra i frame
+
+                if not self.frame_queue_argento.full():
+                    
+                    # Se necessario, invia una copia o una versione ridimensionata
+                    if ArduinoManager.motor_state == True and self.raccogliendo_palle == False:
+                        self.frame_queue_argento.put(frame.copy())
                 try:
                     cv2.imshow("Camera principale", frame)
                     cv2.imshow("Rilevamento colori", frame_colori)

@@ -4,7 +4,7 @@ from ultralytics import YOLO
 def test_yolo_confidenza(model_path):
     model = YOLO(model_path)
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
