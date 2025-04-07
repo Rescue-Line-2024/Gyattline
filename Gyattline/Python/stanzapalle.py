@@ -30,6 +30,8 @@ class BallsController:
         self.inseguendo_pallina = True  
         # Tempo dell'ultima scansione per eseguire una rotazione
         self.last_scan_time = time.time()
+
+        self.timerpalleverde = time.time() - 3
         # Intervallo di tempo (in secondi) fra una scansione e l'altra
         self.scan_interval = 8  
         # Durata della rotazione di scansione
@@ -58,6 +60,7 @@ class BallsController:
                 cls = int(box.cls[0])
                 conf = float(box.conf[0])
                 if conf > 0.75 and (cls == 1 or cls == 0):
+                    self.timerpalleverde = time.time()
                     x1, y1, x2, y2 = box.xyxy[0]
                     center_x = (x1 + x2) / 2.0
                     # Calcola la correzione PID in base alla posizione
@@ -69,11 +72,16 @@ class BallsController:
                     cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     # Se la pallina è "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
-                    if y2 > 220:
-                        print("Pallina vicina: la prendo!")
-                        # Esegue la procedura per prendere la pallina
-                        self.prendi_pallina()
-                        self.inseguendo_pallina = False
+                    if y2 > 210:
+                        if abs(correzione) < 30:
+                            print("Pallina vicina: la prendo!")
+                            # Esegue la procedura per prendere la pallina
+                            self.prendi_pallina()
+                            self.inseguendo_pallina = False
+                        else: 
+                            print("pallina vicina mi aggiusto")
+                            
+                            DX , SX = self.pid.calcolapotenzamotori(correzione * 100)
                         return True
                     else:
                         # Regola i motori per inseguire la pallina
@@ -95,6 +103,7 @@ class BallsController:
             print("Nessun cassonetto verde trovato")
             return False
         
+        self.timerpalleverde = time.time()
         # Unisce i contorni e crea un rettangolo
         contours = np.vstack(contours).astype(np.int32)
         x, y, w, h = cv2.boundingRect(contours)
@@ -209,6 +218,10 @@ class BallsController:
         if self.inseguendo_pallina:
             self.bin_found = False
             self.ball_found = self.riconosci_palla_argento(frame)
+            if self.timerpalleverde > time.time() - 3:
+                self.ball_found = True
+
+
             if self.ball_found:
                 activity = "Inseguo/Pallina trovata"
                 # La funzione 'riconosci_palla_argento' gestisce già l'inseguimento e la presa
@@ -230,6 +243,9 @@ class BallsController:
         else:
             self.ball_found = False
             self.bin_found = self.insegui_cassonetto_verde(frame)
+            if self.timerpalleverde > time.time() - 3:
+                self.bin_found = True
+                 
             if self.bin_found:
                 activity = "Deposito pallina (cassonetto trovato)"
                 # La funzione 'insegui_cassonetto_verde' gestisce l'inseguimento e il deposito

@@ -18,14 +18,14 @@ Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);
 // - Sensore Destro:     trig = 8,  echo = 7
 // - Sensore Sinistro:   trig = 5,  echo = 6
 // --------------------------
-#define FRONT_TRIG 3
+#define FRONT_TRIG 5
 #define FRONT_ECHO 4
 
-#define RIGHT_TRIG 8
-#define RIGHT_ECHO 7
+#define RIGHT_TRIG 7
+#define RIGHT_ECHO 6
 
-#define LEFT_TRIG 5
-#define LEFT_ECHO 6
+#define LEFT_TRIG 3
+#define LEFT_ECHO 2
 
 #define IN_A0  A0  // (Non modificato; verificare se è effettivamente usato)
 
@@ -50,8 +50,8 @@ void AvviaServoIndietro(int speed, int speed2) {
 }
 
 void AvviaMotori(int DX, int SX, int lim = 100) {
-  int potenzaDX = constrain(DX, -lim, lim)*-1;
-  int potenzaSX = constrain(SX, -lim, lim)*-1;
+  int potenzaDX = constrain(DX, -lim, lim);
+  int potenzaSX = constrain(SX, -lim, lim);
 
   // Avvia i motori anteriori (aggiunge un offset di 10 per compensare eventuali disallineamenti)
   AvviaServoAvanti(potenzaDX + 10, -potenzaSX + 10);
@@ -115,17 +115,17 @@ void setup() {
   AvviaServoAvanti(10, 10);
   AvviaServoIndietro(10, 10);
 
-  impostaservo(160,6); //telecamera 200 quasi tutta su 160 giu
-  impostaservo(80,4); //130 chiuso 80 aperto mano sinistra
-  impostaservo(100, 5); //mano destro 30 chiuso 100 aperto
-  impostaservo(130,9); //130 su //10 giu braccio
+  impostaservo(50,6); //telecamera 95 quasi tutta su 50 giu
+  impostaservo(40,5); //110 chiuso 40 aperto mano sinistra
+  impostaservo(120, 4); //mano destro 20 chiuso 120 apetrto
+  impostaservo(180,9); //180 su //130 giu braccio
 
 
 
 
  
   // Configurazione del pin analogico (se necessario)
-  pinMode(12,INPUT);
+  pinMode(9,INPUT);
 
   // Configura i pin dei sensori ad ultrasuoni
   // Sensore frontale
@@ -144,20 +144,20 @@ void setup() {
 
 void apri_mani()
 {
-  impostaservo(80,4); //130 chiuso 80 aperto mano sinistra
-  impostaservo(100, 5); //mano destro 30 chiuso 100 aperto
+  impostaservo(40,5); //110 chiuso 40 aperto mano sinistra
+  impostaservo(120, 4); //mano destro 20 chiuso 120 apetrto
 }
 
 void chiudi_mani()
 {
-  impostaservo(130,4); //130 chiuso 80 aperto mano sinistra
-  impostaservo(30, 5); //mano destro 30 chiuso 100 aperto
+  impostaservo(110,5); //110 chiuso 40 aperto mano sinistra
+  impostaservo(20, 4); //mano destro 20 chiuso 120 apetrto
 }
 void braccio_su(){
-impostaservo(130,9); //120 su //20 giu braccio
+impostaservo(180,9); //180 su //130 giu braccio
 }
 void braccio_giu(){
-impostaservo(10,9); //120 su //20 giu braccio
+impostaservo(130,9); //180 su //130 giu braccio
 }
 // --------------------------
 // LOOP PRINCIPALE
