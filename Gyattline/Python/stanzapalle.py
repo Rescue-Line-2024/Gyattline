@@ -5,10 +5,12 @@ from ArduinoManager import ArduinoManager
 from ric_colori import RiconosciColori
 from ultralytics import YOLO
 import os,sys
+import threading
 from PID import gpPID
 
 class BallsController:
     def __init__(self):
+        self.active = False
         self.sensor_timer = time.time()
 
         current_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -38,6 +40,15 @@ class BallsController:
         self.scan_duration = 16
         self.scan_start_time = time.time()
         self.correzione = 0
+        self.latest_ball_position = None  # ad esempio: (center_x, timestamp)
+
+                # Lock per proteggere l'accesso a self.latest_ball_position
+        self.ball_lock = threading.Lock()
+
+        # Avvio del thread per l'inferenza
+        self.inference_thread = threading.Thread(target=self.run_inference)
+        self.inference_thread.start()
+
         '''
         Se il muro è a destra: 3 secondi a sinistra e poi 3 a destra
         else: 3 secondi a destra e poi 3 a sinistra
@@ -49,38 +60,79 @@ class BallsController:
         self.ball_found = False
         self.bin_found = False
 
+        
+
+    def run_inference(self):
+        """
+        Thread dedicato all'inferenza: estrae continuamente l'ultimo frame disponibile e aggiorna la posizione della pallina.
+        """
+        # Ciclo infinito del thread d'inferenza
+        while True:
+            if self.active == False:
+                time.sleep(0.1)  # o anche time.sleep(0.05) se serve più asdawsww
+                continue
+
+            # Qui puoi ottenere il frame dalla camera (o ricevere l'ultimo frame dal loop principale
+            # in base alla tua architettura). In questo esempio supponiamo di avere una coda o
+            # una variabile condivisa self.current_frame che viene aggiornata nel loop principale.
+            if hasattr(self, 'current_frame'):
+                # Usa una copia del frame per evitare conflitti
+                frame_copy = self.current_frame.copy()
+                # Ridimensionamento per velocizzare l'inferenza
+                results = self.model(frame_copy)
+                for result in results:
+                    for box in result.boxes:
+                        cls = int(box.cls[0])
+                        conf = float(box.conf[0])
+                        if conf > 0.75 and (cls == 1 or cls == 0):
+                            # Calcola il centro della bounding box; opzionalmente, riporta le coordinate a quelle originali
+                            x1, y1, x2, y2 = box.xyxy[0]
+                            # Aggiorna la variabile condivisa con la posizione rilevata (con lock)
+                            with self.ball_lock:
+                                self.latest_ball_position = ((x1,y1,x2,y2), time.time())
+                            # Esci dal ciclo appena trovata una pallina (puoi gestire più palline se vuoi)
+                            break
+            # Breve delay per non saturare la CPU
+            time.sleep(0.01)
+
     def riconosci_palla_argento(self, frame):
-        """
-        Rileva la pallina (argento o nera) nel frame.
-        Se rilevata, esegue la logica di inseguimento.
-        Restituisce True se la pallina è stata individuata.
-        """
-        results = self.model(frame)
-        for result in results:
-            for box in result.boxes:
-                cls = int(box.cls[0])
-                conf = float(box.conf[0])
-                if conf > 0.75 and (cls == 1 or cls == 0):
-                    self.timerpalleverde = time.time()
-                    x1, y1, x2, y2 = box.xyxy[0]
-                    center_x = (x1 + x2) / 2.0
-                    # Calcola la correzione PID in base alla posizione
-                    self.correzione = int(self.pid.calcolopid(center_x))
+            """
+            In questo metodo ora non esegui l'inferenza, ma usi la posizione aggiornata dal thread.
+            """
+            # Aggiorna il frame corrente in modo che il thread di inferenza possa utilizzarlo
+            self.current_frame = frame
+
+            # Leggi la posizione rilevata dal thread (con lock)
+            with self.ball_lock:
+                ball_info = self.latest_ball_position
+
+            if ball_info is not None:
+                print("PALLINA !!!! ")
+                coords, timestamp = ball_info
+                x1 , y1 , x2 , y2 = coords
+                # Se la rilevazione è recente (ad esempio, entro 0.5 secondi), usala
+                if time.time() - timestamp < 0.5:
+                    correzione = int(self.pid.calcolopid((x1+x2) //2))
                     # Disegna la bounding box per debug
                     pt1 = (int(x1), int(y1))
                     pt2 = (int(x2), int(y2))
                     cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
-                    cv2.putText(frame, f"Deviazione: {self.correzione}", (pt1[0], pt1[1]-10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
                     # Se la pallina è "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
-                    if y2 > 190:
-                        if abs(self.correzione) < 90:
+
+                    if y2 > 200:  # sostituisci questa condizione con quella che determina la vicinanza
+                        if abs(correzione) < 60:
                             print("Pallina vicina: la prendo!")
-                            # Esegue la procedura per prendere la pallina
                             self.prendi_pallina()
                             self.inseguendo_pallina = False
+                        else:
+                            DX, SX = self.pid.calcolapotenzamotori(correzione)
+                            print(f"Inseguendo pallina: MOTORI : DX-{DX} SX-{SX}")
+                            ArduinoManager.send_motor_commands(DX, SX)
                         return True
-        return False
+            return False
 
     def insegui_cassonetto_verde(self, frame):
         """
@@ -167,6 +219,7 @@ class BallsController:
 
 
     def main(self, frame, dimensions):
+        self.active = True
         self.width, self.height_frame = dimensions
         current_time = time.time()
         
@@ -190,6 +243,8 @@ class BallsController:
                 ArduinoManager.set_camera(90)
                 self.scanning_active = True
                 self.scan_start_time = current_time
+                print("ahahahhahaha")
+                time.sleep(0.2)
 
             # Se eseguo la scansione e non ho trovato né pallina né cassonetto
             if self.scanning_active:
@@ -198,14 +253,17 @@ class BallsController:
                     self.scan(-1)  # mi allontano dal muro
 
 
-                # Se la durata di scansione è terminata, ferma la rotazione
-            if current_time - self.scan_start_time >= self.scan_duration:
+            # Se la durata di scansione è terminata, ferma la rotazione
+            if current_time - self.scan_start_time >= self.scan_duration and self.scanning_active == True:
                     ArduinoManager.set_camera(75)
                     self.scanning_active = False
                     self.last_scan_time = current_time
+                    print("haha2")
+                    time.sleep(0.2)
 
         # Se il robot sta inseguendo la pallina
         if self.inseguendo_pallina:
+            self.active = True
             self.bin_found = False
             self.ball_found = self.riconosci_palla_argento(frame)
             if self.timerpalleverde > time.time() - 3:
@@ -215,6 +273,8 @@ class BallsController:
                 
                 ArduinoManager.send_motor_commands(DX, SX)
                 self.ball_found = True
+            else:
+                self.ball_found = False
                 
 
 
@@ -237,6 +297,7 @@ class BallsController:
                 else:
                     ArduinoManager.send_motor_commands(20, 20)
         else:
+            self.active = False
             self.ball_found = False
             self.bin_found = self.insegui_cassonetto_verde(frame)
             if self.timerpalleverde > time.time() - 3:
