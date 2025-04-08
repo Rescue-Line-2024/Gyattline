@@ -50,7 +50,7 @@ class Seguilinea:
         
         if time.time() - self.sensor_timer > self.sensor_request_interval: #ogni tanto richiedi i sensori
             ArduinoManager.request_sensor_data()
-            #print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
+            print(f"Front : {ArduinoManager.front_sensor} Left : {ArduinoManager.left_sensor} Right : {ArduinoManager.right_sensor}")
             if ArduinoManager.front_sensor is not None:
                 if ArduinoManager.front_sensor < 15:
                     self.sensor_counter +=1

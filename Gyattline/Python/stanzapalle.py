@@ -21,7 +21,7 @@ class BallsController:
         
         self.model = YOLO(self.model_path)
         # PID per la correzione durante la raccolta o il deposito
-        self.pid = gpPID(P=1.4, I=0, D=0, setpoint=self.width / 2)
+        self.pid = gpPID(P=1, I=0, D=0, setpoint=self.width / 2)
         self.wall_pid = gpPID(P=12, I=0, D=0, setpoint=20)
 
         self.sensor_request_interval = 0.2
@@ -35,8 +35,9 @@ class BallsController:
         # Intervallo di tempo (in secondi) fra una scansione e l'altra
         self.scan_interval = 8  
         # Durata della rotazione di scansione
-
-        self.scan_duration = 6 
+        self.scan_duration = 16
+        self.scan_start_time = time.time()
+        self.correzione = 0
         '''
         Se il muro è a destra: 3 secondi a sinistra e poi 3 a destra
         else: 3 secondi a destra e poi 3 a sinistra
@@ -64,30 +65,20 @@ class BallsController:
                     x1, y1, x2, y2 = box.xyxy[0]
                     center_x = (x1 + x2) / 2.0
                     # Calcola la correzione PID in base alla posizione
-                    correzione = int(self.pid.calcolopid(center_x))
+                    self.correzione = int(self.pid.calcolopid(center_x))
                     # Disegna la bounding box per debug
                     pt1 = (int(x1), int(y1))
                     pt2 = (int(x2), int(y2))
                     cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
-                    cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
+                    cv2.putText(frame, f"Deviazione: {self.correzione}", (pt1[0], pt1[1]-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     # Se la pallina è "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
-                    if y2 > 210:
-                        if abs(correzione) < 30:
+                    if y2 > 190:
+                        if abs(self.correzione) < 90:
                             print("Pallina vicina: la prendo!")
                             # Esegue la procedura per prendere la pallina
                             self.prendi_pallina()
                             self.inseguendo_pallina = False
-                        else: 
-                            print("pallina vicina mi aggiusto")
-                            
-                            DX , SX = self.pid.calcolapotenzamotori(correzione * 100)
-                        return True
-                    else:
-                        # Regola i motori per inseguire la pallina
-                        DX, SX = self.pid.calcolapotenzamotori(correzione)
-                        print(f"seguendo pallina ; MOTORI : DX-{DX} SX-{SX}")
-                        ArduinoManager.send_motor_commands(DX, SX)
                         return True
         return False
 
@@ -110,7 +101,7 @@ class BallsController:
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         
         # Se il cassonetto è sufficientemente vicino (ad esempio, in base a w e posizione verticale)
-        if y + h > 230 and w > 280:
+        if y + h > 230 and w > 200:
             print("Cassonetto vicino: deposito in corso!")
             self.inseguendo_pallina = True
             self.deposita_pallina()
@@ -128,12 +119,12 @@ class BallsController:
         """
         Procedura per prendere la pallina.
         """
-        ArduinoManager.send_motor_commands(-15, -15)
+        ArduinoManager.send_motor_commands(-15, -12)
         time.sleep(1.5)
         ArduinoManager.send_message("pinza", "chiudi_braccia")
         print("Abbasso braccia")
         time.sleep(2)
-        ArduinoManager.send_motor_commands(15, 15)
+        ArduinoManager.send_motor_commands(12, 15)
         time.sleep(6)
         ArduinoManager.send_message("pinza", "chiudi_mani")
         print("Chiudo mani")
@@ -141,7 +132,7 @@ class BallsController:
         ArduinoManager.send_message("pinza", "apri_braccia")
         print("Alzo braccia")
         time.sleep(1)
-        ArduinoManager.send_motor_commands(-20,-20)
+        ArduinoManager.send_motor_commands(-12,-15)
         print("Alzo braccia")
         time.sleep(3)
 
@@ -150,8 +141,8 @@ class BallsController:
         Procedura per depositare la pallina.
         """
         print("Deposito della pallina: apro le mani")
-        ArduinoManager.send_motor_commands(15, 15)
-        time.sleep(3)
+        ArduinoManager.send_motor_commands(12, 15)
+        time.sleep(2)
         ArduinoManager.send_message("pinza", "chiudi_braccia")
         time.sleep(0.2)
         ArduinoManager.send_message("pinza", "apri_mani")
@@ -167,7 +158,7 @@ class BallsController:
 
     def turn(self):
         print("ho un muro d'avanti! mi giro ")
-        if ArduinoManager.last_obstacle_position == "right":
+        if ArduinoManager.last_obstacle_position == "left":
             ArduinoManager.send_motor_commands(motor_dx=20, motor_sx=-20) #gira a destra
         else:
             ArduinoManager.send_motor_commands(motor_dx=-20, motor_sx=20) #gira a sinistra
@@ -192,34 +183,39 @@ class BallsController:
             self.turn()
             activity = "Turn (ostacolo davanti)"
             print("girando(anche i coglioni girano)")
-        
-        # Gestione della scansione non bloccante
-        if not self.scanning_active and (current_time - self.last_scan_time > self.scan_interval):
-            self.scanning_active = True
-            self.scan_start_time = current_time
+            
+        if not self.ball_found and not self.bin_found:
+            # Gestione della scansione non bloccante
+            if not self.scanning_active and (current_time - self.last_scan_time > self.scan_interval):
+                ArduinoManager.set_camera(90)
+                self.scanning_active = True
+                self.scan_start_time = current_time
 
-        # Se eseguo la scansione e non ho trovato né pallina né cassonetto
-        if self.scanning_active and not self.ball_found and not self.bin_found:
-            if current_time - self.scan_start_time < 3:
-                activity = "Scanning: allontanandomi dal muro"
-                print("allontanandomi dal muro")
-                self.scan(1)  # mi allontano dal muro
-            else:
-                activity = "Scanning: riavvicinandomi"
-                print("riavvicinandomi")
-                self.scan(-1)  # inverto direzione e torno verso il muro
+            # Se eseguo la scansione e non ho trovato né pallina né cassonetto
+            if self.scanning_active:
+                    activity = "Scanning: allontanandomi dal muro"
+                    print("girando . . .")
+                    self.scan(-1)  # mi allontano dal muro
 
-            # Se la durata di scansione è terminata, ferma la rotazione
+
+                # Se la durata di scansione è terminata, ferma la rotazione
             if current_time - self.scan_start_time >= self.scan_duration:
-                self.scanning_active = False
-                self.last_scan_time = current_time
+                    ArduinoManager.set_camera(75)
+                    self.scanning_active = False
+                    self.last_scan_time = current_time
 
         # Se il robot sta inseguendo la pallina
         if self.inseguendo_pallina:
             self.bin_found = False
             self.ball_found = self.riconosci_palla_argento(frame)
             if self.timerpalleverde > time.time() - 3:
+                DX, SX = self.pid.calcolapotenzamotori(self.correzione)
+                        
+                print(f"seguendo pallina ; MOTORI : DX-{DX} SX-{SX}")
+                
+                ArduinoManager.send_motor_commands(DX, SX)
                 self.ball_found = True
+                
 
 
             if self.ball_found:

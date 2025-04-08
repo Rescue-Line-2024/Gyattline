@@ -72,7 +72,7 @@ class Robot:
         self.argento_process.start()
 
     def serial_communication(self):
-        conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
+        conn = SerialConnection(port='/dev/ttyUSB0', baudrate=115200)
         try:
             conn.open_connection()
             
@@ -104,7 +104,7 @@ class Robot:
                                 self.raccogliendo_palle = False
                                 #zonapalle.andato_avanti = False
                                 ArduinoManager.motor_limit = 30
-                                ArduinoManager.set_camera(165)
+                                ArduinoManager.set_camera(50)
                                 time.sleep(0.1)
 
                     
@@ -225,14 +225,16 @@ class Robot:
                             print("i sensori non funzionano,impossibile prendere le palle.")
                             self.raccogliendo_palle = False
 
-                    if ArduinoManager.last_obstacle_position == "left":
+                    if ArduinoManager.last_obstacle_position == "right":
                         self.zonapalle.wall_pid.inverted *= -1
 
-                    ArduinoManager.set_camera(190)
+                    ArduinoManager.set_camera(75)
                     time.sleep(1)
                     self.ag_visto = False
                     if self.on_serial == False: #testing mode
                         self.raccogliendo_palle = True
+
+                    self.zonapalle.last_scan_time = time.time()
 
                     
 
