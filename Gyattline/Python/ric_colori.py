@@ -47,7 +47,7 @@ class RiconosciColori:
 
 
 
-        ret, threshold = cv2.threshold(blur, 70, 255, cv2.THRESH_BINARY_INV)
+        ret, threshold = cv2.threshold(blur, 90, 255, cv2.THRESH_BINARY_INV)
 
         RiconosciColori.thresh = threshold
 

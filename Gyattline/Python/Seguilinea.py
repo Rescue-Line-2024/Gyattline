@@ -35,7 +35,7 @@ class Seguilinea:
         self.avoiding_obstacle = False
 
         self.sensor_timer = time.time()
-        self.sensor_request_interval = 0.5
+        self.sensor_request_interval = 0.3
         self.sensor_counter = 0
         self.w = 0
 
@@ -61,9 +61,10 @@ class Seguilinea:
             return
         
         
-        if self.avoiding_obstacle == False and self.sensor_counter >= 3:
-            if(ArduinoManager.handle_obstacle(1) == True):
+        if self.avoiding_obstacle == False and self.sensor_counter >= 1:
+            if(ArduinoManager.detect_obstacle() == True):
                 #incomincia schivata ostacolo
+                ArduinoManager.handle_obstacle(0.75)
                 print("sto schivando ostacolo")
                 self.avoiding_obstacle = True
         
@@ -76,14 +77,14 @@ class Seguilinea:
             self.sensor_request_interval = 0.1
             ArduinoManager.pass_obstacle()
             print(self.w)
-            if self.w > 200:
+            if self.w > 150:
                 print("ostacolo schivato!")
                 ArduinoManager.motor_limit = 30
                 if ArduinoManager.last_obstacle_position == "right":
-                    ArduinoManager.send_motor_commands(-25,25)
-                else:
                     ArduinoManager.send_motor_commands(25,-25)
-                time.sleep(1.5)
+                else:
+                    ArduinoManager.send_motor_commands(-25,25)
+                time.sleep(0.5)
 
                 self.sensor_request_interval = 0.5
                 self.avoiding_obstacle = False
@@ -140,8 +141,15 @@ class Seguilinea:
                     self.last_green_direction = "DOPPIO"
                     deviation = self.pid_manager.compute_deviation_h(0, h, self.cut_y,is_line_centered) #girerà su se stesso
                     motor_dx, motor_sx = self.pid_manager.compute_motor_commands(deviation)
+
+                    '''
+                    ArduinoManager.send_motor_commands(ArduinoManager.motor_limit, ArduinoManager.motor_limit)
+                    time.sleep(1)
+                    '''
                     ArduinoManager.send_motor_commands(motor_dx, motor_sx)
-                    time.sleep(1.3)
+                    time.sleep(1)
+                    self.line_analyzer.timer_doppio = time.time() +2 
+                    self.last_green_direction = None
                     return
                     # Inserisci qui la logica specifica se necessario.
 

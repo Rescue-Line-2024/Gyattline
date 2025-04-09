@@ -28,7 +28,7 @@ class PIDManager:
             return deviation
         else:
             deviation /= multiplicator_h
-            print("Mul:",multiplicator_h)
+            #print("Mul:",multiplicator_h)
             return deviation * self.P2
 
     def compute_motor_commands(self, deviation):

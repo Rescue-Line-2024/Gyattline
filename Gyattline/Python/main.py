@@ -17,24 +17,23 @@ logging.getLogger("ultralytics").setLevel(logging.ERROR)
 # Funzione globale per il riconoscimento dell'argento
 def riconosci_argento_process(frame_queue, argento_queue):
     # Carica il modello YOLO all'interno del processo
-    model = YOLO("silver_classify_s.pt")
+    model = YOLO("my_model.pt")
     while True:
         if not frame_queue.empty():
+            #print("riconoscendo argento ...")
             frame = frame_queue.get()
-            results = model(frame)
-            confidence = results[0].probs.data[1].item()
-
-            # Stampa il riepilogo tipo "0: 128x128 Silver 0.71, Line 0.29, 77.6ms"
-            print("Confidenza argento",confidence)
-
-            # Mostra il frame annotato
-            annotated_frame = results[0].plot()
-            cv2.imshow("YOLO - Inference", annotated_frame)
-            argento_queue.put(confidence)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-    cv2.destroyAllWindows()
+            punti = []  # Valore di default nel caso non vengano trovate box
+            results = model.predict(frame, imgsz=128, conf=0.4, workers=4, verbose=False)
+            for res in results:
+                for box in res.boxes:
+                    conf = float(box.conf[0])
+                    if conf > 0.75:
+                        punti = box.xywh[0]
+                        print("Punti trovati:", punti)
+            try:
+                argento_queue.put(punti.numpy())
+            except Exception as e:
+                argento_queue.put(punti)
 
             
             
@@ -69,7 +68,7 @@ class Robot:
         # Avvia i thread
         self.serial_thread.start()
         self.camera_thread.start()
-        self.argento_process.start()
+        #self.argento_process.start()
 
     def serial_communication(self):
         conn = SerialConnection(port='/dev/ttyUSB0', baudrate=115200)
@@ -104,7 +103,7 @@ class Robot:
                                 self.raccogliendo_palle = False
                                 #zonapalle.andato_avanti = False
                                 ArduinoManager.motor_limit = 30
-                                ArduinoManager.set_camera(50)
+                                ArduinoManager.set_camera(55)
                                 time.sleep(0.1)
 
                     
@@ -156,8 +155,8 @@ class Robot:
         Line_follower = Seguilinea(
             cam=cam,
             pid_params=pid_params,
-            P2=1.5,
-            pen_multiplier=0.7,
+            P2=1.7,
+            pen_multiplier=0.001,
             cam_resolution=(width, height),
             min_area=50,
             cut_percentage=0.6,
@@ -181,14 +180,28 @@ class Robot:
 
 
                 
-                 #Gestione del risultato di YOLO (riconoscimento dell'argento)
-                if not self.argento_queue.empty() and self.raccogliendo_palle == False:
+                # Gestione del risultato di YOLO (riconoscimento dell'argento)
+                if not self.argento_queue.empty():
                     argento_trovato = self.argento_queue.get()
                     print("Risultato argento:", argento_trovato)
-                    if argento_trovato > 0.5:
-                        self.ag_visto = True
-                        print("ARGENTOOOO!!!")
+                    if isinstance(argento_trovato, (list, np.ndarray)) and len(argento_trovato) == 4:
+                        x, y, w, h = map(int, argento_trovato)
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
+                        # Esempio: se l'argento è nella metà inferiore dell'immagine
+                        if y > height / 2:
+                            
+                            print("ARGENTO TROVATO!! attendi un po")
+                            if self.ag_timer < time.time()-0.5:
+                                if w > 200:
+                                    self.ag_visto = True
+                                    self.raccogliendo_palle = True
+                                    print("ARGENTOOOO!!!")
+                        else:
+                            self.ag_timer = time.time()
+                            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                            print("ARGENTO NON TROVATO ma c'è!!")
+                            self.ag_visto = False
                     else:
                         self.ag_timer = time.time()
                         print("ARGENTO NON TROVATO!!")
@@ -200,7 +213,7 @@ class Robot:
                     
                     print("argento! andando avanti")
                     time.sleep(0.3) 
-                    for i in range (10):
+                    while ArduinoManager.front_sensor is None:
                         ArduinoManager.request_sensor_data()
                         print(ArduinoManager.front_sensor,ArduinoManager.left_sensor,ArduinoManager.right_sensor)
                         time.sleep(0.1)
@@ -228,7 +241,7 @@ class Robot:
                     if ArduinoManager.last_obstacle_position == "right":
                         self.zonapalle.wall_pid.inverted *= -1
 
-                    ArduinoManager.set_camera(75)
+                    ArduinoManager.set_camera(90)
                     time.sleep(1)
                     self.ag_visto = False
                     if self.on_serial == False: #testing mode
@@ -244,7 +257,7 @@ class Robot:
                     self.zonapalle.main(frame, (width, height))
                 else:
                     self.zonapalle.active = False
-                    zoom_factor = 1.2  # Puoi aumentare o diminuire questo valore per modificare lo zoom
+                    zoom_factor = 1.1  # Puoi aumentare o diminuire questo valore per modificare lo zoom
                     h, w, _ = frame.shape
                     new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
 
@@ -268,24 +281,22 @@ class Robot:
                             ArduinoManager.send_motor_commands(0, 0)
                         # Mostra i frame aggiornati e passa alla prossima iterazione
                         cv2.imshow("Camera principale", frame)
-                        cv2.imshow("Rilevamento colori", frame_colori)
                         if cv2.waitKey(1) & 0xFF == ord('q'):
                             ArduinoManager.message = {"action": "stop"}
                             self.stop_signal = True
                         continue
                         
+                    if not self.frame_queue_argento.full():
+                    # Se necessario, invia una copia o una versione ridimensionata
+                      if ArduinoManager.motor_state == True and self.raccogliendo_palle == False:
+                        self.frame_queue_argento.put(frame.copy())
                     Line_follower.follow_line(frame)
 
                 # Mostra i frame
 
-                if not self.frame_queue_argento.full():
-                    
-                    # Se necessario, invia una copia o una versione ridimensionata
-                    if ArduinoManager.motor_state == True and self.raccogliendo_palle == False:
-                        self.frame_queue_argento.put(frame.copy())
+
                 try:
                     cv2.imshow("Camera principale", frame)
-                    cv2.imshow("Rilevamento colori", frame_colori)
                 except Exception as e:
                     print("Errore nell'apertura delle finestre:", e)
                 
