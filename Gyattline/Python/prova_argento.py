@@ -29,7 +29,7 @@ while True:
     # edges = cv2.Canny(gray, 30, 100)
 
     # Trova le linee con HoughLinesP
-    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=20, maxLineGap=15)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=30, minLineLength=20, maxLineGap=15)
     # cv2.drawContours(frame, edges, -1, (0,255,255), 1)
 
     # Analizza ogni linea

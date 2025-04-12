@@ -10,7 +10,7 @@ cap.set(3, wd)
 cap.set(4, hd)
 
 # Caricamento del modello YOLO
-model = YOLO("my_model.pt")
+model = YOLO("pietro_model.pt")
 
 def riconosci_nero(frame_queue, nero_queue):
     while True:

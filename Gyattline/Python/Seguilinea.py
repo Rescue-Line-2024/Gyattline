@@ -103,7 +103,7 @@ class Seguilinea:
             # Prendi la prima bounding box rilevata
             x, y, w, h = line_bboxes[0]
 
-            is_line_centered = x > 300 and x+w < self.cam_x-300 #per vedere se la linea si trova più o meno al centro
+            is_line_centered = x > 100 and x+w < self.cam_x-100 #per vedere se la linea si trova più o meno al centro
             # Ripristino la coordinata y nel sistema completo
             y_original = y + int(self.cam_y * self.cut_percentage)
             adjusted_bbox = (x, y_original, w, h)

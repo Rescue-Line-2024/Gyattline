@@ -47,9 +47,12 @@ def riconosci_argento_process(frame_queue, argento_queue):
                             color = (0, 0, 255)  # rosso in BGR
                             thickness = 3
                             cv2.putText(frame, text, org, font, font_scale, color,thickness,cv2.LINE_AA)
-                            
-            if len(lines) > 45:
+            
+            if lines is not None:
+             if len(lines) > 50:
                 argento_queue.put(True)
+             else:
+                argento_queue.put(False)
             else:
                 argento_queue.put(False)
                             
@@ -177,10 +180,10 @@ class Robot:
             cam=cam,
             pid_params=pid_params,
             P2=1.5,
-            pen_multiplier=0.13,
+            pen_multiplier=0.17,
             cam_resolution=(width, height),
             min_area=50,
-            cut_percentage=0.3,
+            cut_percentage=0.6,
             motor_limit=30
         )
         
@@ -213,7 +216,6 @@ class Robot:
 
                     
                     cv2.imshow("Camera principale", frame)
-                    cv2.imshow("Rilevamento colori", frame_colori)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         ArduinoManager.message = {"action": "stop"}
                         self.stop_signal = True
@@ -276,9 +278,11 @@ class Robot:
 
                     
                 if self.raccogliendo_palle:
+                    self.zonapalle.active = True
                     ArduinoManager.motor_limit = 15
                     self.zonapalle.main(frame, (width, height))
                 else:
+                    self.zonapalle.active = False
                     zoom_factor = 1.4  # Puoi aumentare o diminuire questo valore per modificare lo zoom
                     h, w, _ = frame.shape
                     new_w, new_h = int(w / zoom_factor), int(h / zoom_factor)
