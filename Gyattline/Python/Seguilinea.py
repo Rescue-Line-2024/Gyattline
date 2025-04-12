@@ -61,8 +61,9 @@ class Seguilinea:
             return
         
         
-        if self.avoiding_obstacle == False and self.sensor_counter >= 3:
-            if(ArduinoManager.handle_obstacle(1) == True):
+        if self.avoiding_obstacle == False and self.sensor_counter >= 2:
+            if(ArduinoManager.detect_obstacle() == True):
+                ArduinoManager.handle_obstacle(0.7)
                 #incomincia schivata ostacolo
                 print("sto schivando ostacolo")
                 self.avoiding_obstacle = True
@@ -83,7 +84,7 @@ class Seguilinea:
                     ArduinoManager.send_motor_commands(-25,25)
                 else:
                     ArduinoManager.send_motor_commands(25,-25)
-                time.sleep(1.5)
+                time.sleep(0.5)
 
                 self.sensor_request_interval = 0.5
                 self.avoiding_obstacle = False
@@ -102,7 +103,7 @@ class Seguilinea:
             # Prendi la prima bounding box rilevata
             x, y, w, h = line_bboxes[0]
 
-            is_line_centered = x > 100 and x+w < self.cam_x-100 #per vedere se la linea si trova più o meno al centro
+            is_line_centered = x > 300 and x+w < self.cam_x-300 #per vedere se la linea si trova più o meno al centro
             # Ripristino la coordinata y nel sistema completo
             y_original = y + int(self.cam_y * self.cut_percentage)
             adjusted_bbox = (x, y_original, w, h)

@@ -58,13 +58,15 @@ class ArduinoManager:
             cls.message = {"action": "get_sensors", "data": " "}
         #logging.debug("Richiesta dati sensori.")
 
+
+    @classmethod
+    def detect_obstacle(cls):
+        if cls.front_sensor is not None and cls.front_sensor < 15:
+            return True
+        
     @classmethod
     def handle_obstacle(cls, obstacle_sleep=1):
-        """
-        Se il sensore frontale rileva un ostacolo (ad esempio, distanza < 15 cm),
-        esegue la procedura di schivata.
-        """
-        if cls.front_sensor is not None and cls.front_sensor < 15:
+        
             logging.info("Ostacolo rilevato!")
             # Ferma i motori
             cls.send_motor_commands(0, 0)
@@ -91,21 +93,21 @@ class ArduinoManager:
             # Muovi all'indietro per un attimo
             cls.send_motor_commands(-cls.motor_limit, -cls.motor_limit)
             print("INDIETRO!")
-            time.sleep(obstacle_sleep*1.2)
+            time.sleep(obstacle_sleep*0.5)
             # Ruota in base alla direzione scelta
             if direction == "right":
-                cls.send_motor_commands(-cls.motor_limit, cls.motor_limit)
+                cls.send_motor_commands(cls.motor_limit, -cls.motor_limit)
                 print("DESTRA!!")
                 cls.pid_wall.inverted = -1
             else:
-                cls.send_motor_commands(cls.motor_limit, -cls.motor_limit)
+                cls.send_motor_commands(-cls.motor_limit, cls.motor_limit)
                 print("SINISTRA!!!")
                 cls.pid_wall.inverted = 1
 
             time.sleep(obstacle_sleep * 1.7)
 
             cls.send_motor_commands(cls.motor_limit, cls.motor_limit)
-            time.sleep(obstacle_sleep * 2.5)
+            time.sleep(obstacle_sleep * 1)
             # In un ciclo di correzione si potrebbe verificare il ripristino della linea
             # (qui semplificato: si esce subito)
             cls.front_sensor = None
@@ -113,8 +115,6 @@ class ArduinoManager:
             cls.right_sensor = None
 
             cls.last_obstacle_position = direction
-            return True 
-        return False
 
     @classmethod
     def pass_obstacle(cls):
@@ -129,7 +129,7 @@ class ArduinoManager:
             if sensor > 10:
                 motor_dx, motor_sx = (0,25)
 
-            if cls.last_obstacle_position == "right":
+            if cls.last_obstacle_position == "left":
                 temp = motor_dx
                 motor_dx = motor_sx
                 motor_sx = temp

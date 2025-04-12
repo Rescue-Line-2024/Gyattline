@@ -7,48 +7,6 @@ from ultralytics import YOLO
 import os,sys
 from PID import gpPID
 
-def riconosci_palla_argento(self, frame_queue, palline_queue):
-        """
-        Rileva la pallina (argento o nera) nel frame.
-        Se rilevata, esegue la logica di inseguimento.
-        Restituisce True se la pallina √® stata individuata.
-        """
-        if not frame_queue.empty():
-            frame = frame_queue.get()
-            results = self.model.predict(frame, imgsz=128, conf=0.4, workers=4, verbose=False)
-            for result in results:
-                for box in result.boxes:
-                    cls = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    if conf > 0.75 and (cls == 1 or cls == 0):
-                        x1, y1, x2, y2 = box.xyxy[0]
-                        center_x = (x1 + x2) / 2.0
-                        # Calcola la correzione PID in base alla posizione
-                        correzione = int(self.pid.calcolopid(center_x))
-                        # Disegna la bounding box per debug
-                        pt1 = (int(x1), int(y1))
-                        pt2 = (int(x2), int(y2))
-                        cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        # Se la pallina √® "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
-                        if y2 > 235:
-                                print("Pallina vicina: la prendo!")
-                                # Esegue la procedura per prendere la pallina
-                                self.prendi_pallina()
-                                self.inseguendo_pallina = False
-                                return True
-
-                                
-                        else:
-                            # Regola i motori per inseguire la pallina
-                            DX, SX = self.pid.calcolapotenzamotori(correzione)
-                            print(f"seguendo pallina ; MOTORI : DX-{DX} SX-{SX}")
-                            ArduinoManager.send_motor_commands(DX, SX)
-                            return True
-        return False
-
-
 class BallsController:
     def __init__(self):
         self.sensor_timer = time.time()
@@ -68,7 +26,7 @@ class BallsController:
 
         self.sensor_request_interval = 0.2
         
-        # Flag per gestire la modalit√†: True => raccolta palline, False => deposito
+        # Flag per gestire la modalit‡: True => raccolta palline, False => deposito
         self.inseguendo_pallina = True  
         # Tempo dell'ultima scansione per eseguire una rotazione
         self.last_scan_time = time.time()
@@ -78,7 +36,7 @@ class BallsController:
 
         self.scan_duration = 6 
         '''
-        Se il muro √® a destra: 3 secondi a sinistra e poi 3 a destra
+        Se il muro Ë a destra: 3 secondi a sinistra e poi 3 a destra
         else: 3 secondi a destra e poi 3 a sinistra
         '''
         self.intervallo_verdi = ([40, 80, 80], [85, 255, 255])
@@ -87,20 +45,57 @@ class BallsController:
         self.scanning_active = False
         self.ball_found = False
         self.bin_found = False
-        
-        self.frame_queue = multiprocessing.Queue(maxsize=5)
-        self.palline_queue = multiprocessing.Process(maxsize=5)
-        self.palline_process = multiprocessin (
-            target = riconosci_palla_argento,
-            args = (self.frame_queue, self.palline_queue)
-        )
-    
+
+    def riconosci_palla_argento(self, frame):
+        """
+        Rileva la pallina (argento o nera) nel frame.
+        Se rilevata, esegue la logica di inseguimento.
+        Restituisce True se la pallina Ë stata individuata.
+        """
+        results = self.model(frame)
+        for result in results:
+            for box in result.boxes:
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                if conf > 0.75 and (cls == 1 or cls == 0):
+                    x1, y1, x2, y2 = box.xyxy[0]
+                    center_x = (x1 + x2) / 2.0
+                    # Calcola la correzione PID in base alla posizione
+                    correzione = int(self.pid.calcolopid(center_x))
+                    # Disegna la bounding box per debug
+                    pt1 = (int(x1), int(y1))
+                    pt2 = (int(x2), int(y2))
+                    cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
+                    cv2.putText(frame, f"Deviazione: {correzione}", (pt1[0], pt1[1]-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    # Se la pallina Ë "vicina" (ad esempio, se la parte inferiore della bbox supera una soglia)
+                    if y2 > 210:
+                        if abs(correzione) < 20:
+                            print("Pallina vicina: la prendo!")
+                            # Esegue la procedura per prendere la pallina
+                            self.prendi_pallina()
+                            self.inseguendo_pallina = False
+                            return True
+                        else:
+                            DX, SX = self.pid.calcolapotenzamotori(correzione*100) #cosi va o a destra o a sinistra,senza vie di mezzo
+                            print(f"PALLA VICINA,CORREGGENDO ; MOTORI : DX-{DX} SX-{SX}")
+                            ArduinoManager.send_motor_commands(DX, SX)
+                            return True
+
+                            
+                    else:
+                        # Regola i motori per inseguire la pallina
+                        DX, SX = self.pid.calcolapotenzamotori(correzione)
+                        print(f"seguendo pallina ; MOTORI : DX-{DX} SX-{SX}")
+                        ArduinoManager.send_motor_commands(DX, SX)
+                        return True
+        return False
 
     def insegui_cassonetto_verde(self, frame):
         """
         Rileva il cassonetto verde nel frame.
         Se rilevato, esegue la procedura di deposito della pallina.
-        Restituisce True se il deposito √® stato effettuato.
+        Restituisce True se il deposito Ë stato effettuato.
         """
         mask_verde = self.ric_cassonetto_verde.riconosci_colore_mask(frame)
         contours, _ = cv2.findContours(mask_verde, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -113,7 +108,7 @@ class BallsController:
         x, y, w, h = cv2.boundingRect(contours)
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         
-        # Se il cassonetto √® sufficientemente vicino (ad esempio, in base a w e posizione verticale)
+        # Se il cassonetto Ë sufficientemente vicino (ad esempio, in base a w e posizione verticale)
         if y + h > 230 and w > 280:
             print("Cassonetto vicino: deposito in corso!")
             self.inseguendo_pallina = True
@@ -183,7 +178,7 @@ class BallsController:
         self.width, self.height_frame = dimensions
         current_time = time.time()
         
-        # Inizializza una stringa che indichi l'attivit√† attuale
+        # Inizializza una stringa che indichi l'attivit‡ attuale
         activity = "Idle"
 
         if time.time() - self.sensor_timer > self.sensor_request_interval:  # ogni tanto richiedi i sensori
@@ -202,7 +197,7 @@ class BallsController:
             self.scanning_active = True
             self.scan_start_time = current_time
 
-        # Se eseguo la scansione e non ho trovato n√© pallina n√© cassonetto
+        # Se eseguo la scansione e non ho trovato nÈ pallina nÈ cassonetto
         if self.scanning_active and not self.ball_found and not self.bin_found:
             if current_time - self.scan_start_time < 3:
                 activity = "Scanning: allontanandomi dal muro"
@@ -213,7 +208,7 @@ class BallsController:
                 print("riavvicinandomi")
                 self.scan(-1)  # inverto direzione e torno verso il muro
 
-            # Se la durata di scansione √® terminata, ferma la rotazione
+            # Se la durata di scansione Ë terminata, ferma la rotazione
             if current_time - self.scan_start_time >= self.scan_duration:
                 self.scanning_active = False
                 self.last_scan_time = current_time
@@ -224,7 +219,7 @@ class BallsController:
             self.ball_found = self.riconosci_palla_argento(frame)
             if self.ball_found:
                 activity = "Inseguo/Pallina trovata"
-                # La funzione 'riconosci_palla_argento' gestisce gi√† l'inseguimento e la presa
+                # La funzione 'riconosci_palla_argento' gestisce gi‡ l'inseguimento e la presa
             elif not self.scanning_active:  # se non sto scannerizzando, utilizzo PID col muro
                 activity = "PID col muro (inseguimento pallina)"
                 print("pid muro")
@@ -265,5 +260,5 @@ class BallsController:
         # Aggiunge un delay di 0.1 secondi
         time.sleep(0.1)
 
-        # Scrive l'attivit√† sul frame
+        # Scrive l'attivit‡ sul frame
         cv2.putText(frame, activity, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)

@@ -17,23 +17,48 @@ import numpy as np
 # Funzione globale per il riconoscimento dell'argento
 def riconosci_argento_process(frame_queue, argento_queue):
     # Carica il modello YOLO all'interno del processo
-    model = YOLO("my_model.pt")
     while True:
         if not frame_queue.empty():
             #print("riconoscendo argento ...")
             frame = frame_queue.get()
-            punti = []  # Valore di default nel caso non vengano trovate box
-            results = model(frame)
-            for res in results:
-                for box in res.boxes:
-                    conf = float(box.conf[0])
-                    if conf > 0.75:
-                        punti = box.xywh[0]
-                        print("Punti trovati:", punti)
-            try:
-                argento_queue.put(punti.numpy())
-            except Exception as e:
-                argento_queue.put(punti)
+            hsv = cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, 10, 45)
+            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=20, maxLineGap=15)
+            c = 0
+            
+            if lines is not None:
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    
+                    mask = np.zeros_like(gray)
+                    cv2.line(mask, (x1, y1), (x2, y2), 255, 2)
+                    pixels = hsv[mask == 255]
+                    if len(pixels) > 0:
+                        mean_s = np.mean(pixels[:, 1])
+                        mean_v = np.mean(pixels[:, 2])
+                        
+                        if mean_s < 30 and mean_v > 200:                   # if mean_s > 5 and mean_s < 40 and mean_v > 100 and mean_v < 230:
+                            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Disegna in verde                    
+                            text = f"{len(lines)} linee"
+                            org = (50, 50)  # posizione del testo (x, y)
+                            font = cv2.FONT_HERSHEY_SIMPLEX
+                            font_scale = 2
+                            color = (0, 0, 255)  # rosso in BGR
+                            thickness = 3
+                            cv2.putText(frame, text, org, font, font_scale, color,thickness,cv2.LINE_AA)
+                            
+            if len(lines) > 45:
+                argento_queue.put(True)
+            else:
+                argento_queue.put(False)
+                            
+            cv2.imshow("Argento .  . .", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
+                break
+
+            
 
 class Robot:
     def __init__(self):
@@ -66,7 +91,7 @@ class Robot:
         self.argento_process.start()
 
     def serial_communication(self):
-        conn = SerialConnection(port='/dev/ttyACM0', baudrate=115200)
+        conn = SerialConnection(port='/dev/ttyUSB0', baudrate=115200)
         try:
             conn.open_connection()
             
@@ -99,7 +124,7 @@ class Robot:
                                 self.raccogliendo_palle = False
                                 #zonapalle.andato_avanti = False
                                 ArduinoManager.motor_limit = 30
-                                ArduinoManager.set_camera(160)
+                                ArduinoManager.set_camera(55)
                                 time.sleep(0.1)
 
                     
@@ -129,6 +154,7 @@ class Robot:
         Funzione principale con videocamera.
         """
         cam = cv2.VideoCapture(0)
+        cam2 = cv2.VideoCapture(2)
         
         if not cam.isOpened():
             print("Errore nell'apertura della camera.")
@@ -138,27 +164,34 @@ class Robot:
         desired_height = 240
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, desired_width)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
+        cam2.set(cv2.CAP_PROP_FRAME_WIDTH, desired_width)
+        cam2.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
 
         width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("Risoluzione corrente:", width, height)
         
-        pid_params = (2, 0, 0) # (Kp, Ki, Kd)
+        pid_params = (1, 0, 0) # (Kp, Ki, Kd)
         # Crea l'istanza del SeguiLinea
         Line_follower = Seguilinea(
             cam=cam,
             pid_params=pid_params,
             P2=1.5,
-            pen_multiplier=0.1,
+            pen_multiplier=0.13,
             cam_resolution=(width, height),
             min_area=50,
-            cut_percentage=0.5,
+            cut_percentage=0.3,
             motor_limit=30
         )
         
         try:
             while not self.stop_signal:
-                ret, frame = cam.read()
+                if not self.raccogliendo_palle:
+                    ret, frame = cam.read()
+                else:
+                    ret, frame = cam2.read()
+                    
+                    
                 if not ret:
                     print("Errore nella lettura del frame.")
                     break
@@ -196,25 +229,10 @@ class Robot:
                 if not self.argento_queue.empty():
                     argento_trovato = self.argento_queue.get()
                     print("Risultato argento:", argento_trovato)
-                    if isinstance(argento_trovato, (list, np.ndarray)) and len(argento_trovato) == 4:
-                        x, y, w, h = map(int, argento_trovato)
-                        # Esempio: se l'argento è nella metà inferiore dell'immagine
-                        if y > height / 2:
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                            print("ARGENTO TROVATO!! attendi un po")
-                            if self.ag_timer < time.time()-0.5:
+                    if argento_trovato:
                                 self.ag_visto = True
                                 self.raccogliendo_palle = True
                                 print("ARGENTOOOO!!!")
-                        else:
-                            self.ag_timer = time.time()
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                            print("ARGENTO NON TROVATO ma c'è!!")
-                            self.ag_visto = False
-                    else:
-                        self.ag_timer = time.time()
-                        print("ARGENTO NON TROVATO!!")
-                        self.ag_visto = False
 
 
                 if self.ag_visto and self.raccogliendo_palle == False:
@@ -271,7 +289,7 @@ class Robot:
                     y2 = y1 + new_h
 
                     # Ritaglio e ridimensionamento
-                    frame = frame[y1:y2, x1:x2]  # Ritaglia la parte centrale
+                    frame = frame[y1:y2, ]  # Ritaglia la parte centrale
                     frame = cv2.resize(frame, (w, h))  # Ridimensiona alla risoluzione originale
                     Line_follower.follow_line(frame)
 
